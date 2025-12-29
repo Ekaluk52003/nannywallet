@@ -27,13 +27,14 @@ const App: React.FC = () => {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   // Filter States
-  const [filterMonth, setFilterMonth] = useState<number | 'all'>(new Date().getMonth());
+  const [filterMonth, setFilterMonth] = useState<number | 'all' | 'custom'>(new Date().getMonth());
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [filterType, setFilterType] = useState<'all' | TransactionType>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | TransactionStatus>('all');
   const [filterCategory, setFilterCategory] = useState<string | 'all'>('all');
 
-  const [isRecording, setIsRecording] = useState(false);
-  const [isProcessingVoice, setIsProcessingVoice] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<'idle' | 'listening' | 'processing'>('idle');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
@@ -114,6 +115,7 @@ const App: React.FC = () => {
   };
 
   const startRecording = async () => {
+    console.log("Starting recording...");
     if (!geminiApiKey) {
       alert("กรุณาระบุ Gemini API Key ในส่วนการตั้งค่าก่อนใช้งานผู้ช่วยเสียง");
       setShowSettings(true);
@@ -124,75 +126,138 @@ const App: React.FC = () => {
       const recorder = new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      
+      recorder.ondataavailable = (e) => { 
+        if (e.data.size > 0) audioChunksRef.current.push(e.data); 
+      };
+      
       recorder.onstop = async () => {
+        console.log("Recorder stopped, processing audio...");
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        console.log("Audio blob size:", audioBlob.size);
         await processAudio(audioBlob);
         stream.getTracks().forEach(track => track.stop());
       };
+      
       recorder.start();
-      setIsRecording(true);
+      setVoiceStatus('listening');
+      console.log("Recording started");
     } catch (err) {
+      console.error("Error accessing microphone:", err);
       alert("ไม่สามารถเข้าถึงไมโครโฟนได้ กรุณาอนุญาตการเข้าถึง");
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    console.log("Stop recording clicked");
+    if (mediaRecorderRef.current && voiceStatus === 'listening') {
+      console.log("Stopping recorder manually");
+      setVoiceStatus('processing');
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
     }
   };
 
   const processAudio = async (blob: Blob) => {
-    setIsProcessingVoice(true);
+    console.log("Processing audio function called");
+    setVoiceStatus('processing');
+    
+    // Start timer to enforce minimum loading state
+    const startTime = Date.now();
+    
     try {
-      const reader = new FileReader();
-      reader.readAsDataURL(blob);
-      reader.onloadend = async () => {
-        const base64Audio = (reader.result as string).split(',')[1];
-        const result = await processVoiceCommand(geminiApiKey, base64Audio, 'audio/webm');
-        if (result && result.amount) {
-          const newTx: Transaction = {
-            id: crypto.randomUUID(),
-            type: (result.type as any) || 'expense',
-            amount: result.amount,
-            category: result.category || 'รายจ่ายอื่นๆ',
-            date: result.date || new Date().toISOString().split('T')[0],
-            description: result.description || 'บันทึกด้วยเสียง',
-            status: result.status || 'paid'
-          };
-          handleAddTransaction(newTx);
-        } else {
-          alert("ไม่เข้าใจข้อมูลที่คุณพูด ลองพูดว่า: 'จ่ายค่าอาหารกลางวันไปหกสิบบาท'");
-        }
-      };
+      console.log("Audio Blob size:", blob.size);
+      if (blob.size === 0) {
+        throw new Error("Audio blob is empty");
+      }
+
+      // 1. Convert to Base64
+      console.log("Converting to base64...");
+      const base64Audio = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onloadend = () => {
+          if (typeof reader.result === 'string') {
+            resolve(reader.result.split(',')[1]);
+          } else {
+            reject(new Error('Failed to convert audio to base64'));
+          }
+        };
+        reader.onerror = reject;
+      });
+      console.log("Base64 conversion complete");
+
+      // 2. Send to Gemini
+      console.log("Sending to Gemini...");
+      const result = await processVoiceCommand(geminiApiKey, base64Audio, 'audio/webm')
+        .catch(err => {
+          console.error("Gemini API Error:", err);
+          return null;
+        });
+      console.log("Gemini response received:", result);
+
+      // 3. Enforce minimum loading time (2 seconds)
+      const elapsed = Date.now() - startTime;
+      const minDuration = 2000;
+      if (elapsed < minDuration) {
+        await new Promise(resolve => setTimeout(resolve, minDuration - elapsed));
+      }
+
+      if (result && result.amount) {
+        const newTx: Transaction = {
+          id: crypto.randomUUID(),
+          type: (result.type as any) || 'expense',
+          amount: result.amount,
+          category: result.category || 'รายจ่ายอื่นๆ',
+          date: result.date || new Date().toISOString().split('T')[0],
+          description: result.description || 'บันทึกด้วยเสียง',
+          status: result.status || 'paid'
+        };
+        handleAddTransaction(newTx);
+      } else {
+        // Use a small timeout to allow the UI to update before alerting
+        setTimeout(() => alert("ไม่เข้าใจข้อมูลที่คุณพูด ลองพูดว่า: 'จ่ายค่าอาหารกลางวันไปหกสิบบาท'"), 100);
+      }
     } catch (error) {
-      console.error(error);
+      console.error("Error processing audio:", error);
+      // Ensure we still waited if it failed super fast, to avoid flicker
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 1000) {
+        await new Promise(resolve => setTimeout(resolve, 1000 - elapsed));
+      }
+      setTimeout(() => alert("เกิดข้อผิดพลาดในการประมวลผลเสียง"), 100);
     } finally {
-      setIsProcessingVoice(false);
+      console.log("Finished processing audio");
+      setVoiceStatus('idle');
     }
   };
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => {
-      let monthMatch = true;
-      if (filterMonth !== 'all') {
+      let dateMatch = true;
+      if (filterMonth === 'custom') {
+        if (startDate && t.date < startDate) dateMatch = false;
+        if (endDate && t.date > endDate) dateMatch = false;
+      } else if (filterMonth !== 'all') {
         const parts = t.date.split('-');
         if (parts.length >= 2) {
           const tMonth = parseInt(parts[1], 10) - 1;
-          monthMatch = tMonth === filterMonth;
+          dateMatch = tMonth === filterMonth;
         }
       }
       const typeMatch = filterType === 'all' || t.type === filterType;
       const statusMatch = filterStatus === 'all' || t.status === filterStatus;
       const categoryMatch = filterCategory === 'all' || t.category === filterCategory;
-      return monthMatch && typeMatch && statusMatch && categoryMatch;
+      return dateMatch && typeMatch && statusMatch && categoryMatch;
     });
-  }, [transactions, filterMonth, filterType, filterStatus, filterCategory]);
+  }, [transactions, filterMonth, startDate, endDate, filterType, filterStatus, filterCategory]);
 
   const monthFilteredTransactions = useMemo(() => {
     return transactions.filter(t => {
+      if (filterMonth === 'custom') {
+        if (startDate && t.date < startDate) return false;
+        if (endDate && t.date > endDate) return false;
+        return true;
+      }
       if (filterMonth === 'all') return true;
       const parts = t.date.split('-');
       if (parts.length >= 2) {
@@ -200,7 +265,7 @@ const App: React.FC = () => {
       }
       return false;
     });
-  }, [transactions, filterMonth]);
+  }, [transactions, filterMonth, startDate, endDate]);
 
   const totals = useMemo(() => {
     return monthFilteredTransactions.reduce((acc, t) => {
@@ -485,7 +550,7 @@ function doPost(e) {
                 <div className="space-y-0.5">
                   <p className="text-indigo-100/70 text-[10px] font-bold uppercase tracking-widest">ยอดคงเหลือสุทธิ</p>
                   <p className="text-white text-xs font-semibold">
-                    {filterMonth === 'all' ? 'ทั้งหมด' : `เดือน ${MONTHS_THAI[filterMonth as number]}`}
+                    {filterMonth === 'all' ? 'ทั้งหมด' : filterMonth === 'custom' ? 'กำหนดเอง' : `เดือน ${MONTHS_THAI[filterMonth as number]}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 backdrop-blur-md">
@@ -493,9 +558,14 @@ function doPost(e) {
                   <select 
                     className="bg-transparent text-[10px] font-bold text-white outline-none cursor-pointer"
                     value={filterMonth}
-                    onChange={(e) => setFilterMonth(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === 'all' || val === 'custom') setFilterMonth(val);
+                      else setFilterMonth(parseInt(val));
+                    }}
                   >
                     <option value="all" className="text-slate-900">ทั้งหมด</option>
+                    <option value="custom" className="text-slate-900">กำหนดเอง</option>
                     {MONTHS_THAI.map((m, i) => (
                       <option key={m} value={i} className="text-slate-900">{m}</option>
                     ))}
@@ -585,16 +655,26 @@ function doPost(e) {
                     <p className="text-indigo-100/80 text-xs">บันทึกรายการด้วยเสียง (ภาษาไทย)</p>
                   </div>
                 </div>
-                {isProcessingVoice && <Loader2 size={24} className="animate-spin text-white/50" />}
+                {voiceStatus === 'processing' && <Loader2 size={24} className="animate-spin text-white/50" />}
               </div>
               <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/10 mb-6 text-center shadow-inner">
-                {isRecording ? (
+                {voiceStatus === 'listening' ? (
                   <div className="space-y-4 py-2">
                     <div className="flex justify-center gap-1.5 h-10 items-center">
                       {[1,2,3,4,5,6].map(i => <div key={i} className="w-1.5 bg-white rounded-full animate-bounce" style={{ height: `${20 + Math.random()*80}%`, animationDelay: `${i*0.08}s` }}></div>)}
                     </div>
                     <p className="text-sm font-medium animate-pulse">กำลังฟังเสียงของคุณ...</p>
                     <button onClick={stopRecording} className="mx-auto flex items-center gap-2 px-8 py-3 bg-rose-500 hover:bg-rose-600 rounded-2xl font-bold shadow-lg active:scale-95 transition-all"><Square size={18} /> หยุดและบันทึก</button>
+                  </div>
+                ) : voiceStatus === 'processing' ? (
+                  <div className="space-y-4 py-4">
+                    <div className="flex justify-center items-center h-12">
+                       <Loader2 size={40} className="text-indigo-200 animate-spin" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">กำลังคุยกับ Gemini...</p>
+                      <p className="text-xs text-indigo-200/60">ระบบกำลังวิเคราะห์ข้อมูลรายรับ-รายจ่ายของคุณ</p>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-4 py-2">
@@ -604,10 +684,10 @@ function doPost(e) {
                     </p>
                     <button 
                       onClick={startRecording} 
-                      disabled={isProcessingVoice} 
+                      disabled={voiceStatus === 'processing'} 
                       className="mx-auto flex items-center gap-3 px-10 py-4 bg-white text-indigo-600 hover:bg-indigo-50 rounded-2xl font-bold shadow-lg disabled:opacity-50 active:scale-95 transition-all"
                     >
-                      <Mic size={22} /> {isProcessingVoice ? 'กำลังประมวลผล...' : 'กดเพื่อพูด'}
+                      <Mic size={22} /> กดเพื่อพูด
                     </button>
                   </div>
                 )}
@@ -625,6 +705,10 @@ function doPost(e) {
             onEditTransaction={setEditingTransaction}
             filterMonth={filterMonth}
             onMonthChange={setFilterMonth}
+            startDate={startDate}
+            endDate={endDate}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
             filterType={filterType}
             onTypeChange={setFilterType}
             filterStatus={filterStatus}
@@ -634,6 +718,18 @@ function doPost(e) {
           />
         </div>
       </main>
+
+      <footer className="py-8 text-center pb-12">
+        <div className="flex items-center justify-center gap-2 mb-2 opacity-60">
+          <div className="p-1.5 bg-indigo-600 rounded-lg text-white">
+            <Wallet size={12} />
+          </div>
+          <span className="font-bold text-sm text-slate-400 dark:text-slate-500">App คุณยายดวง</span>
+        </div>
+        <p className="text-[10px] text-slate-400/60 dark:text-slate-600 font-medium">
+          ช่วยคุณยายจดบันทึกรายรับ-รายจ่ายง่ายๆ
+        </p>
+      </footer>
 
       {/* Transaction Modal (Add/Edit) */}
       {(isAddModalOpen || editingTransaction) && (
