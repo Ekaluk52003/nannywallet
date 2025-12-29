@@ -1,0 +1,147 @@
+
+import React, { useState, useMemo } from 'react';
+import { Transaction, TransactionType } from '../types';
+import { PieChart, TrendingDown, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react';
+
+interface Props {
+  transactions: Transaction[];
+}
+
+const CATEGORY_COLORS: Record<string, string> = {
+  // Expenses
+  'ค่าเช่า/ค่าบ้าน': '#6366f1',
+  'ของสด/ซูเปอร์มาร์เก็ต': '#10b981',
+  'ทานข้าวนอกบ้าน': '#f59e0b',
+  'ค่าน้ำ/ค่าไฟ/สาธารณูปโภค': '#3b82f6',
+  'การเดินทาง': '#8b5cf6',
+  'ความบันเทิง': '#ec4899',
+  'สุขภาพ/ยา': '#ef4444',
+  'ช้อปปิ้ง': '#f43f5e',
+  'ค่าสมาชิก (Subscription)': '#06b6d4',
+  'รายจ่ายอื่นๆ': '#94a3b8',
+  
+  // Income
+  'เงินเดือน': '#10b981',
+  'โบนัส': '#34d399',
+  'การลงทุน': '#60a5fa',
+  'งานอิสระ (Freelance)': '#818cf8',
+  'ของขวัญ': '#f472b6',
+  'รายได้อื่นๆ': '#94a3b8'
+};
+
+const CategoryBreakdown: React.FC<Props> = ({ transactions }) => {
+  const [viewType, setViewType] = useState<TransactionType>('expense');
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const stats = useMemo(() => {
+    const filtered = transactions.filter(t => t.type === viewType);
+    const total = filtered.reduce((sum, t) => sum + t.amount, 0);
+    
+    const breakdown = filtered.reduce((acc, t) => {
+      acc[t.category] = (acc[t.category] || 0) + t.amount;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return Object.entries(breakdown)
+      .map(([category, amount]) => ({
+        category,
+        amount,
+        percentage: total > 0 ? (amount / total) * 100 : 0,
+        color: CATEGORY_COLORS[category] || '#cbd5e1'
+      }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [transactions, viewType]);
+
+  const totalAmount = stats.reduce((sum, s) => sum + s.amount, 0);
+
+  let cumulativePercentage = 0;
+  const pieSegments = stats.map((s) => {
+    const start = cumulativePercentage;
+    cumulativePercentage += s.percentage;
+    return { ...s, start };
+  });
+
+  if (transactions.length === 0 || totalAmount === 0) {
+    return (
+      <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-8 border border-slate-200 dark:border-slate-700 text-center">
+        <p className="text-slate-400 text-sm font-medium">ไม่มีข้อมูลสรุปสำหรับประเภทนี้</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-sm transition-all overflow-hidden">
+      <div className="p-6 pb-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <PieChart size={18} className="text-indigo-500" />
+          <h3 className="font-bold text-slate-800 dark:text-slate-100">
+            สรุป{viewType === 'expense' ? 'รายจ่าย' : 'รายรับ'}
+          </h3>
+        </div>
+        
+        <div className="flex items-center gap-2">
+           <button 
+            onClick={() => setViewType(viewType === 'expense' ? 'income' : 'expense')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border ${viewType === 'expense' ? 'bg-rose-500 border-rose-400 text-white' : 'bg-emerald-500 border-emerald-400 text-white'}`}
+          >
+            {viewType === 'expense' ? <TrendingDown size={12} /> : <TrendingUp size={12} />}
+            {viewType === 'expense' ? 'ดูรายรับ' : 'ดูรายจ่าย'}
+          </button>
+          <button onClick={() => setIsCollapsed(!isCollapsed)} className="p-2 text-slate-400">
+            {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+          </button>
+        </div>
+      </div>
+
+      {!isCollapsed && (
+        <div className="px-6 pb-8 pt-2">
+          <div className="flex flex-col gap-6 items-center">
+            <div className="relative">
+              <svg viewBox="0 0 100 100" className="w-40 h-40 -rotate-90">
+                {pieSegments.map((s, i) => (
+                  <circle
+                    key={i}
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="transparent"
+                    stroke={s.color}
+                    strokeWidth="12"
+                    strokeDasharray={`${(s.percentage * 251.2) / 100} 251.2`}
+                    strokeDashoffset={`${-(s.start * 251.2) / 100}`}
+                    className="transition-all duration-700"
+                  />
+                ))}
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ยอดรวม</span>
+                <span className="text-sm font-black text-slate-800 dark:text-white">฿{totalAmount.toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div className="w-full space-y-2.5 max-h-40 overflow-y-auto custom-scrollbar pr-2">
+              {stats.map((s, i) => (
+                <div key={i} className="flex items-center justify-between group">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.color }}></div>
+                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 truncate max-w-[140px]">
+                      {s.category}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[11px] font-black text-slate-800 dark:text-slate-200">
+                      ฿{s.amount.toLocaleString()}
+                    </p>
+                    <p className="text-[9px] text-slate-400 font-bold">{s.percentage.toFixed(1)}%</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default CategoryBreakdown;

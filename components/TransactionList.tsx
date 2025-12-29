@@ -1,0 +1,229 @@
+
+import React from 'react';
+import { Transaction, TransactionStatus, TransactionType } from '../types';
+import { Trash2, Coffee, Home, Car, Heart, ShoppingBag, Briefcase, Gift, Layers, CheckCircle, Calendar, Filter, CreditCard, ArrowDownCircle, Edit2, Play } from 'lucide-react';
+import { MONTHS_THAI, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
+
+interface Props {
+  transactions: Transaction[];
+  onDelete: (id: string) => void;
+  onUpdateStatus?: (id: string, newStatus: TransactionStatus) => void;
+  onEditTransaction?: (transaction: Transaction) => void;
+  filterMonth: number | 'all';
+  onMonthChange: (month: number | 'all') => void;
+  filterType: 'all' | TransactionType;
+  onTypeChange: (type: 'all' | TransactionType) => void;
+  filterStatus: 'all' | TransactionStatus;
+  onStatusChange: (status: 'all' | TransactionStatus) => void;
+  filterCategory: string | 'all';
+  onCategoryChange: (category: string | 'all') => void;
+}
+
+const CategoryIcon: React.FC<{ category: string, size?: number }> = ({ category, size = 16 }) => {
+  const props = { size };
+  const cat = category.toLowerCase();
+  if (cat.includes('ทานข้าว') || cat.includes('อาหาร') || cat.includes('dining')) return <Coffee {...props} />;
+  if (cat.includes('ค่าเช่า') || cat.includes('บ้าน') || cat.includes('rent') || cat.includes('mortgage') || cat.includes('utilities') || cat.includes('สาธารณูปโภค')) return <Home {...props} />;
+  if (cat.includes('เดินทาง') || cat.includes('transport') || cat.includes('รถ')) return <Car {...props} />;
+  if (cat.includes('สุขภาพ') || cat.includes('ยา') || cat.includes('health')) return <Heart {...props} />;
+  if (cat.includes('ช้อปปิ้ง') || cat.includes('shopping') || cat.includes('ซื้อของ')) return <ShoppingBag {...props} />;
+  if (cat.includes('เงินเดือน') || cat.includes('งานอิสระ') || cat.includes('salary') || cat.includes('bonus') || cat.includes('freelance')) return <Briefcase {...props} />;
+  if (cat.includes('ของขวัญ') || cat.includes('gift')) return <Gift {...props} />;
+  if (cat.includes('บันเทิง') || cat.includes('entertainment')) return <Play {...props} />;
+  if (cat.includes('สมาชิก') || cat.includes('subscription')) return <CreditCard {...props} />;
+  return <Layers {...props} />;
+};
+
+const CATEGORY_LIST = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES];
+
+const TransactionList: React.FC<Props> = ({ 
+  transactions, 
+  onDelete, 
+  onUpdateStatus, 
+  onEditTransaction,
+  filterMonth, 
+  onMonthChange,
+  filterType,
+  onTypeChange,
+  filterStatus,
+  onStatusChange,
+  filterCategory,
+  onCategoryChange
+}) => {
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm transition-all">
+      {/* Header & Filters */}
+      <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="font-bold text-lg text-slate-800 dark:text-slate-100">รายการธุรกรรม</h3>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-[0.1em] mt-0.5">
+              {filterMonth === 'all' ? 'ประวัติทั้งหมด' : `เดือน${MONTHS_THAI[filterMonth as number]}`} • {transactions.length} รายการ
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900/50 p-1 rounded-xl border border-slate-100 dark:border-slate-800">
+            <div className="pl-2 text-slate-400"><Calendar size={12} /></div>
+            <select 
+              className="bg-transparent text-[11px] font-bold text-slate-600 dark:text-slate-300 outline-none cursor-pointer pr-3"
+              value={filterMonth}
+              onChange={(e) => onMonthChange(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+            >
+              <option value="all">ทุกเดือน</option>
+              {MONTHS_THAI.map((m, i) => (
+                <option key={m} value={i}>{m}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-slate-100/50 dark:bg-slate-900/30 px-2.5 py-1 rounded-lg border border-slate-100/50 dark:border-slate-800">
+              <Filter size={10} className="text-slate-400" />
+              <select 
+                className="bg-transparent text-[9px] font-black text-slate-500 dark:text-slate-400 outline-none cursor-pointer uppercase tracking-wider"
+                value={filterType}
+                onChange={(e) => {
+                  onTypeChange(e.target.value as any);
+                  onCategoryChange('all');
+                }}
+              >
+                <option value="all">ทุกประเภท</option>
+                <option value="income">รายรับ</option>
+                <option value="expense">รายจ่าย</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-slate-100/50 dark:bg-slate-900/30 px-2.5 py-1 rounded-lg border border-slate-100/50 dark:border-slate-800">
+              <CheckCircle size={10} className="text-slate-400" />
+              <select 
+                className="bg-transparent text-[9px] font-black text-slate-500 dark:text-slate-400 outline-none cursor-pointer uppercase tracking-wider"
+                value={filterStatus}
+                onChange={(e) => onStatusChange(e.target.value as any)}
+              >
+                <option value="all">ทุกสถานะ</option>
+                <option value="paid">เรียบร้อย</option>
+                <option value="pending">รอดำเนินการ</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Compact Category Icon Filter Area */}
+          <div className="flex-1 flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 custom-scrollbar w-full sm:w-auto">
+            <button
+              onClick={() => onCategoryChange('all')}
+              className={`flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-[8px] font-black uppercase transition-all ${filterCategory === 'all' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 dark:bg-slate-900 text-slate-400 hover:bg-slate-100'}`}
+              title="ทั้งหมด"
+            >
+              All
+            </button>
+            {(filterType === 'income' ? INCOME_CATEGORIES : filterType === 'expense' ? EXPENSE_CATEGORIES : CATEGORY_LIST).map(cat => (
+              <button
+                key={cat}
+                onClick={() => onCategoryChange(cat)}
+                className={`flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all ${filterCategory === cat ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 dark:bg-slate-900 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                title={cat}
+              >
+                <CategoryIcon category={cat} size={14} />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Transaction Rows */}
+      <div className="divide-y divide-slate-100 dark:divide-slate-700/50 max-h-[500px] overflow-y-auto custom-scrollbar">
+        {transactions.length === 0 ? (
+          <div className="p-16 text-center flex flex-col items-center">
+            <div className="p-5 rounded-full bg-slate-50 dark:bg-slate-900 mb-3 text-slate-200 dark:text-slate-800">
+              <Layers size={40} />
+            </div>
+            <p className="text-slate-400 dark:text-slate-500 text-xs font-medium">ไม่พบข้อมูลที่ค้นหา</p>
+          </div>
+        ) : (
+          transactions.map((t) => (
+            <div 
+              key={t.id} 
+              onClick={() => onEditTransaction?.(t)}
+              className="group px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-all flex items-center gap-4 cursor-pointer"
+            >
+              {/* Zone 1: Icon */}
+              <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 ${
+                t.status === 'pending' 
+                  ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400' 
+                  : (t.type === 'income' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300')
+              }`}>
+                <CategoryIcon category={t.category} size={18} />
+              </div>
+
+              {/* Zone 2: Details */}
+              <div className="flex-grow min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <p className="font-bold text-[13px] text-slate-800 dark:text-slate-200 truncate">{t.description}</p>
+                </div>
+                <div className="flex items-center gap-2 text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                  <span>{t.category}</span>
+                  <span className="opacity-30">•</span>
+                  <span>{new Date(t.date).toLocaleDateString('th-TH', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                </div>
+              </div>
+
+              {/* Zone 3: Financials & Actions */}
+              <div className="flex items-center gap-4">
+                <div className="text-right min-w-[90px]">
+                  <p className={`font-black text-sm leading-tight ${
+                    t.type === 'income' 
+                      ? 'text-emerald-600 dark:text-emerald-400' 
+                      : (t.status === 'pending' ? 'text-amber-600 dark:text-amber-500' : 'text-slate-800 dark:text-slate-200')
+                  }`}>
+                    {t.type === 'income' ? '+' : '-'}฿{t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  {t.status === 'pending' && (
+                    <p className="text-[8px] font-black text-amber-500/80 uppercase tracking-widest mt-0.5">ยังไม่ชำระ</p>
+                  )}
+                </div>
+
+                <div 
+                  className="flex items-center gap-1.5" 
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {t.status === 'pending' ? (
+                    <button 
+                      onClick={() => onUpdateStatus?.(t.id, 'paid')}
+                      className="flex items-center gap-1.5 h-8 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-[9px] font-black rounded-lg shadow-sm active:scale-95 transition-all uppercase whitespace-nowrap"
+                    >
+                      {t.type === 'expense' ? <CreditCard size={12} /> : <ArrowDownCircle size={12} />}
+                      {t.type === 'expense' ? 'จ่ายแล้ว' : 'รับเงิน'}
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => onUpdateStatus?.(t.id, 'pending')}
+                      className="w-8 h-8 flex items-center justify-center text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all"
+                      title="ยกเลิกสถานะ"
+                    >
+                      <CheckCircle size={16} />
+                    </button>
+                  )}
+                  
+                  <button 
+                    onClick={() => onDelete(t.id)}
+                    className="w-8 h-8 flex items-center justify-center text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/50 rounded-lg transition-all"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+
+                  <div className="hidden sm:flex items-center opacity-0 group-hover:opacity-40 transition-opacity pl-1">
+                    <Edit2 size={12} className="text-slate-400" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default TransactionList;
