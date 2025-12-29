@@ -252,7 +252,7 @@ const App: React.FC = () => {
       const statusMatch = filterStatus === 'all' || t.status === filterStatus;
       const categoryMatch = filterCategory === 'all' || t.category === filterCategory;
       return dateMatch && typeMatch && statusMatch && categoryMatch;
-    });
+    }).sort((a, b) => b.date.localeCompare(a.date));
   }, [transactions, filterMonth, startDate, endDate, filterType, filterStatus, filterCategory]);
 
   const monthFilteredTransactions = useMemo(() => {
