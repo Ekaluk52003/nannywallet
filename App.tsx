@@ -13,6 +13,7 @@ const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   
   const [sheetUrl, setSheetUrl] = useState(localStorage.getItem('wealth_sheet_url') || '');
   const [geminiApiKey, setGeminiApiKey] = useState(localStorage.getItem('wealth_gemini_key') || '');
@@ -51,8 +52,10 @@ const App: React.FC = () => {
   }, [darkMode]);
 
   useEffect(() => {
-    if (sheetUrl) handlePull();
-    else {
+    if (sheetUrl) {
+      setIsDataLoaded(false);
+      handlePull();
+    } else {
       const saved = localStorage.getItem('wealth_transactions');
       if (saved) {
         skipSyncRef.current = true;
@@ -79,12 +82,13 @@ const App: React.FC = () => {
       skipSyncRef.current = true;
       setTransactions(cloudData);
       localStorage.setItem('wealth_transactions', JSON.stringify(cloudData));
+      setIsDataLoaded(true);
     }
     setIsLoading(false);
   };
 
   const handleAutoPush = async () => {
-    if (!sheetUrl || isSyncing || isLoading) return;
+    if (!sheetUrl || isSyncing || isLoading || !isDataLoaded) return;
     setIsSyncing(true);
     const success = await syncToSheets(transactions, sheetUrl);
     if (success) localStorage.setItem('wealth_transactions', JSON.stringify(transactions));
@@ -331,7 +335,7 @@ function doPost(e) {
             <div className="p-2 bg-indigo-600 rounded-lg text-white">
               <Wallet size={20} />
             </div>
-            <span className="font-bold text-xl tracking-tight hidden sm:inline">คุณยายดวง</span>
+            <span className="font-bold text-xl tracking-tight hidden sm:inline">คุณยายดวง - ให้คุณยายจดจร้า</span>
           </div>
           <div className="flex items-center gap-1 sm:gap-3">
             <button 
