@@ -97,7 +97,7 @@ const TransactionList: React.FC<Props> = ({
             )}
             
             <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900/50 p-1 rounded-xl border border-slate-100 dark:border-slate-800">
-              <div className="pl-2 text-slate-400"><Calendar size={12} /></div>
+              <div className="pl-2 text-slate-400 dark:text-slate-500"><Calendar size={12} /></div>
               <select 
                 className="bg-transparent text-[11px] font-bold text-slate-600 dark:text-slate-300 outline-none cursor-pointer pr-3"
                 value={filterMonth}
@@ -107,10 +107,10 @@ const TransactionList: React.FC<Props> = ({
                   else onMonthChange(parseInt(val));
                 }}
               >
-                <option value="all">ทุกเดือน</option>
-                <option value="custom">กำหนดเอง</option>
+                <option value="all" className="text-slate-900">ทุกเดือน</option>
+                <option value="custom" className="text-slate-900">กำหนดเอง</option>
                 {MONTHS_THAI.map((m, i) => (
-                  <option key={m} value={i}>{m}</option>
+                  <option key={m} value={i} className="text-slate-900">{m}</option>
                 ))}
               </select>
             </div>
@@ -129,9 +129,9 @@ const TransactionList: React.FC<Props> = ({
                   onCategoryChange('all');
                 }}
               >
-                <option value="all">ทุกประเภท</option>
-                <option value="income">รายรับ</option>
-                <option value="expense">รายจ่าย</option>
+                <option value="all" className="text-slate-900">ทุกประเภท</option>
+                <option value="income" className="text-slate-900">รายรับ</option>
+                <option value="expense" className="text-slate-900">รายจ่าย</option>
               </select>
             </div>
 
@@ -142,9 +142,9 @@ const TransactionList: React.FC<Props> = ({
                 value={filterStatus}
                 onChange={(e) => onStatusChange(e.target.value as any)}
               >
-                <option value="all">ทุกสถานะ</option>
-                <option value="paid">เรียบร้อย</option>
-                <option value="pending">รอดำเนินการ</option>
+                <option value="all" className="text-slate-900">ทุกสถานะ</option>
+                <option value="paid" className="text-slate-900">เรียบร้อย</option>
+                <option value="pending" className="text-slate-900">รอดำเนินการ</option>
               </select>
             </div>
           </div>
