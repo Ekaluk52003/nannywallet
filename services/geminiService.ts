@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction } from "../types";
+import { INCOME_CATEGORIES, EXPENSE_CATEGORIES } from "../constants";
 
 export async function processVoiceCommand(
   apiKey: string, 
@@ -15,7 +16,10 @@ export async function processVoiceCommand(
     ส่งกลับเป็นวัตถุ JSON ที่มีข้อมูลดังนี้:
     - type: 'income' (รายรับ) หรือ 'expense' (รายจ่าย)
     - amount: จำนวนเงิน (ตัวเลขบวก)
-    - category: หมวดหมู่ที่เหมาะสมที่สุด (เช่น เงินเดือน, ของสด, ทานข้าวนอกบ้าน, การเดินทาง, ช้อปปิ้ง ฯลฯ)
+    - category: หมวดหมู่ที่เหมาะสมที่สุด โดยต้องเลือกจากรายการด้านล่างนี้เท่านั้น:
+        รายรับ: ${INCOME_CATEGORIES.join(', ')}
+        รายจ่าย: ${EXPENSE_CATEGORIES.join(', ')}
+      หากไม่แน่ใจให้ใช้ 'รายได้อื่นๆ' หรือ 'รายจ่ายอื่นๆ'
     - date: วันที่ที่ระบุ หรือถ้าไม่ระบุให้ใช้ค่าวันนี้ (${new Date().toISOString().split('T')[0]}) รูปแบบ YYYY-MM-DD
     - description: สรุปสั้นๆ เกี่ยวกับรายการนี้เป็นภาษาไทย
     - status: 'paid' (ถ้าพูดว่าจ่ายแล้ว/ได้รับแล้ว) หรือ 'pending' (ถ้ายังไม่จ่าย/ค้างจ่าย) หากไม่ระบุให้เป็น 'paid' เป็นค่าเริ่มต้น
@@ -42,7 +46,7 @@ export async function processVoiceCommand(
           properties: {
             type: { type: Type.STRING, enum: ['income', 'expense'] },
             amount: { type: Type.NUMBER },
-            category: { type: Type.STRING },
+            category: { type: Type.STRING, enum: [...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES] },
             date: { type: Type.STRING },
             description: { type: Type.STRING },
             status: { type: Type.STRING, enum: ['paid', 'pending'] }
