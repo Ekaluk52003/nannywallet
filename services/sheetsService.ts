@@ -30,12 +30,23 @@ export async function fetchFromSheets(webhookUrl: string): Promise<Transaction[]
         type = rawAmount < 0 ? 'expense' : 'income';
       }
 
+      // Handle Date - Fix timezone off-by-one error
+      let dateStr = new Date().toISOString().split('T')[0];
+      if (item.date) {
+        const d = new Date(item.date);
+        // Use local time components to prevent timezone shift from UTC
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        dateStr = `${year}-${month}-${day}`;
+      }
+
       return {
         id: String(item.id || crypto.randomUUID()),
         type,
         category: String(item.category || 'อื่นๆ'),
         amount: Math.abs(rawAmount),
-        date: item.date ? new Date(item.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        date: dateStr,
         description: String(item.description || item.category || ''),
         status
       };

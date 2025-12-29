@@ -15,7 +15,17 @@ const TransactionForm: React.FC<Props> = ({ onAdd, onUpdate, initialData, onClos
   const [type, setType] = useState<TransactionType>(initialData?.type || 'expense');
   const [amount, setAmount] = useState(initialData?.amount?.toString() || '');
   const [category, setCategory] = useState(initialData?.category || EXPENSE_CATEGORIES[0]);
-  const [date, setDate] = useState(initialData?.date || new Date().toISOString().split('T')[0]);
+  
+  // Helper to get local date string YYYY-MM-DD
+  const getLocalDate = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const [date, setDate] = useState(initialData?.date || getLocalDate());
   const [description, setDescription] = useState(initialData?.description || '');
   const [status, setStatus] = useState<TransactionStatus>(initialData?.status || 'paid');
 

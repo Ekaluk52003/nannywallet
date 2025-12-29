@@ -107,8 +107,16 @@ const App: React.FC = () => {
 
   const handleDeleteTransaction = (id: string) => setTransactions(prev => prev.filter(t => t.id !== id));
   
+  const getLocalDateISOString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const handleUpdateStatus = (id: string, newStatus: TransactionStatus) => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateISOString();
     setTransactions(prev => prev.map(t => 
       t.id === id ? { 
         ...t, 
@@ -212,7 +220,7 @@ const App: React.FC = () => {
           type: (result.type as any) || 'expense',
           amount: result.amount,
           category: result.category || 'รายจ่ายอื่นๆ',
-          date: result.date || new Date().toISOString().split('T')[0],
+          date: result.date || getLocalDateISOString(),
           description: result.description || 'บันทึกด้วยเสียง',
           status: result.status || 'paid'
         };
