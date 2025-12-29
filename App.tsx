@@ -335,7 +335,12 @@ function doPost(e) {
             <div className="p-2 bg-indigo-600 rounded-lg text-white">
               <Wallet size={20} />
             </div>
-            <span className="font-bold text-xl tracking-tight hidden sm:inline">คุณยายดวง - ให้คุณยายจดจร้า</span>
+            <div className="hidden sm:flex flex-col">
+              <span className="font-bold text-base text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-1">
+                คุณยายดวง 👵
+              </span>
+              <span className="text-[10px] text-indigo-500 font-medium -mt-1">ให้คุณยายช่วยจดจร้า</span>
+            </div>
           </div>
           <div className="flex items-center gap-1 sm:gap-3">
             <button 
