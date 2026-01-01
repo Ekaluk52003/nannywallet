@@ -23,3 +23,10 @@ export interface MonthlyStats {
   income: number;
   expense: number;
 }
+
+export interface SheetConfig {
+  id: string;
+  name: string;
+  url: string;
+  budget?: number;
+}
