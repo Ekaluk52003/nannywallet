@@ -5,8 +5,8 @@ import TransactionList from './components/TransactionList';
 import CategoryBreakdown from './components/CategoryBreakdown';
 import { processVoiceCommand } from './services/geminiService';
 import { syncToSheets, fetchFromSheets } from './services/sheetsService';
-import { Transaction, TransactionStatus, TransactionType } from './types';
-import { Wallet, TrendingUp, TrendingDown, Sparkles, RefreshCw, Settings, Info, AlertCircle, CheckCircle2, Moon, Sun, Mic, Square, Loader2, Key, Calendar, Target, PieChart, Clock, Plus, X, HelpCircle, Code, Copy, ExternalLink, ChevronRight } from 'lucide-react';
+import { Transaction, TransactionStatus, TransactionType, SheetConfig } from './types';
+import { Wallet, TrendingUp, TrendingDown, Sparkles, RefreshCw, Settings, Info, AlertCircle, CheckCircle2, Moon, Sun, Mic, Square, Loader2, Key, Calendar, Target, PieChart, Clock, Plus, X, HelpCircle, Code, Copy, ExternalLink, ChevronRight, Trash2, Check, Layout, Edit2, Save } from 'lucide-react';
 import { MONTHS_THAI } from './constants';
 
 const App: React.FC = () => {
@@ -14,14 +14,45 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
-  
-  const [sheetUrl, setSheetUrl] = useState(localStorage.getItem('wealth_sheet_url') || '');
+
+  // Sheet Management
+  const [sheets, setSheets] = useState<SheetConfig[]>(() => {
+    const saved = localStorage.getItem('wealth_sheets');
+    if (saved) return JSON.parse(saved);
+    const oldUrl = localStorage.getItem('wealth_sheet_url');
+    if (oldUrl) {
+      const oldBudget = Number(localStorage.getItem('wealth_budget')) || 0;
+      return [{ id: 'default', name: 'รายรับ-รายจ่ายหลัก', url: oldUrl, budget: oldBudget }];
+    }
+    return [];
+  });
+
+  const [activeSheetId, setActiveSheetId] = useState<string>(() => {
+    const savedId = localStorage.getItem('wealth_active_sheet_id');
+    if (savedId) return savedId;
+    if (localStorage.getItem('wealth_sheet_url')) return 'default';
+    return '';
+  });
+
+  const activeSheet = sheets.find(s => s.id === activeSheetId);
+  const sheetUrl = activeSheet?.url || '';
+
   const [geminiApiKey, setGeminiApiKey] = useState(localStorage.getItem('wealth_gemini_key') || '');
-  const [monthlyBudget, setMonthlyBudget] = useState(Number(localStorage.getItem('wealth_budget')) || 0);
-  
-  const [showSettings, setShowSettings] = useState(!localStorage.getItem('wealth_sheet_url') || !localStorage.getItem('wealth_gemini_key'));
+
+  const monthlyBudget = activeSheet?.budget || 0;
+
+  const [showSettings, setShowSettings] = useState(!sheetUrl || !localStorage.getItem('wealth_gemini_key'));
   const [showGuide, setShowGuide] = useState(false);
   const [darkMode, setDarkMode] = useState(localStorage.getItem('theme') === 'dark');
+
+  // New Sheet Form State
+  const [newSheetName, setNewSheetName] = useState('');
+  const [newSheetUrl, setNewSheetUrl] = useState('');
+
+  // Edit Sheet State
+  const [editingSheetId, setEditingSheetId] = useState<string | null>(null);
+  const [editSheetName, setEditSheetName] = useState('');
+  const [editSheetUrl, setEditSheetUrl] = useState('');
 
   // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -41,6 +72,15 @@ const App: React.FC = () => {
 
   const skipSyncRef = useRef(true);
 
+  // Persistence for Sheets
+  useEffect(() => {
+    localStorage.setItem('wealth_sheets', JSON.stringify(sheets));
+  }, [sheets]);
+
+  useEffect(() => {
+    localStorage.setItem('wealth_active_sheet_id', activeSheetId);
+  }, [activeSheetId]);
+
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark');
@@ -52,18 +92,44 @@ const App: React.FC = () => {
   }, [darkMode]);
 
   useEffect(() => {
-    if (sheetUrl) {
-      setIsDataLoaded(false);
-      handlePull();
-    } else {
-      const saved = localStorage.getItem('wealth_transactions');
-      if (saved) {
-        skipSyncRef.current = true;
-        setTransactions(JSON.parse(saved));
-      }
+    // Switch context when active sheet changes
+    if (!activeSheetId) {
+      if (sheets.length === 0) setTransactions([]);
+      return;
     }
-  }, [sheetUrl]);
 
+    setIsDataLoaded(false);
+
+    // 1. Try to load from local cache for this specific sheet
+    const localKey = `wealth_transactions_${activeSheetId}`;
+    const saved = localStorage.getItem(localKey);
+
+    if (saved) {
+      skipSyncRef.current = true;
+      setTransactions(JSON.parse(saved));
+      setIsDataLoaded(true);
+    } else if (activeSheetId === 'default' && !localStorage.getItem(localKey)) {
+      // Migration fallback: check legacy key
+      const legacySaved = localStorage.getItem('wealth_transactions');
+      if (legacySaved) {
+        skipSyncRef.current = true;
+        setTransactions(JSON.parse(legacySaved));
+        setIsDataLoaded(true);
+        // Migrate to new key
+        localStorage.setItem(localKey, legacySaved);
+      }
+    } else {
+      // No local data for this sheet, clear transactions to avoid showing wrong data
+      setTransactions([]);
+    }
+
+    // 2. Trigger pull if URL is available
+    if (sheetUrl) {
+      handlePull();
+    }
+  }, [activeSheetId, sheetUrl]); // Re-run when active sheet changes
+
+  // Auto-push only depends on transactions changing, but we need to ensure we push to the correct sheet
   useEffect(() => {
     if (!sheetUrl) return;
     if (skipSyncRef.current) {
@@ -74,24 +140,83 @@ const App: React.FC = () => {
     return () => clearTimeout(timer);
   }, [transactions, sheetUrl]);
 
+  const handleAddSheet = () => {
+    if (!newSheetName.trim() || !newSheetUrl.trim()) return;
+    const newSheet: SheetConfig = {
+      id: crypto.randomUUID(),
+      name: newSheetName,
+      url: newSheetUrl
+    };
+    setSheets(prev => [...prev, newSheet]);
+    setNewSheetName('');
+    setNewSheetUrl('');
+    // If it's the first sheet, auto-select it
+    if (sheets.length === 0) {
+      setActiveSheetId(newSheet.id);
+    }
+  };
+
+  const handleRemoveSheet = (id: string) => {
+    if (!confirm('คุณแน่ใจหรือไม่ที่จะลบชีทนี้?')) return;
+    const newSheets = sheets.filter(s => s.id !== id);
+    setSheets(newSheets);
+    if (activeSheetId === id) {
+      setActiveSheetId(newSheets.length > 0 ? newSheets[0].id : '');
+    }
+  };
+
+  const handleStartEdit = (sheet: SheetConfig) => {
+    setEditingSheetId(sheet.id);
+    setEditSheetName(sheet.name);
+    setEditSheetUrl(sheet.url);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingSheetId(null);
+    setEditSheetName('');
+    setEditSheetUrl('');
+  };
+
+  const handleSaveSheet = () => {
+    if (!editingSheetId || !editSheetName.trim() || !editSheetUrl.trim()) return;
+
+    setSheets(prev => prev.map(s =>
+      s.id === editingSheetId
+        ? { ...s, name: editSheetName, url: editSheetUrl }
+        : s
+    ));
+
+    handleCancelEdit();
+  };
+
   const handlePull = async () => {
-    if (!sheetUrl) return;
+    console.log("handlePull called. URL:", sheetUrl);
+    if (!sheetUrl) {
+      console.warn("No sheetUrl found, aborting pull.");
+      return;
+    }
     setIsLoading(true);
-    const cloudData = await fetchFromSheets(sheetUrl);
-    if (cloudData !== null) {
+    try {
+      const cloudData = await fetchFromSheets(sheetUrl);
       skipSyncRef.current = true;
       setTransactions(cloudData);
-      localStorage.setItem('wealth_transactions', JSON.stringify(cloudData));
+      // Save to sheet-specific storage
+      localStorage.setItem(`wealth_transactions_${activeSheetId}`, JSON.stringify(cloudData));
       setIsDataLoaded(true);
+    } catch (error) {
+      console.error("Failed to pull data:", error);
+      alert(`ไม่สามารถดึงข้อมูลได้: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const handleAutoPush = async () => {
     if (!sheetUrl || isSyncing || isLoading || !isDataLoaded) return;
     setIsSyncing(true);
     const success = await syncToSheets(transactions, sheetUrl);
-    if (success) localStorage.setItem('wealth_transactions', JSON.stringify(transactions));
+    // Save to sheet-specific storage
+    if (success) localStorage.setItem(`wealth_transactions_${activeSheetId}`, JSON.stringify(transactions));
     setIsSyncing(false);
   };
 
@@ -106,7 +231,7 @@ const App: React.FC = () => {
   };
 
   const handleDeleteTransaction = (id: string) => setTransactions(prev => prev.filter(t => t.id !== id));
-  
+
   const getLocalDateISOString = () => {
     const d = new Date();
     const year = d.getFullYear();
@@ -117,11 +242,11 @@ const App: React.FC = () => {
 
   const handleUpdateStatus = (id: string, newStatus: TransactionStatus) => {
     const today = getLocalDateISOString();
-    setTransactions(prev => prev.map(t => 
-      t.id === id ? { 
-        ...t, 
+    setTransactions(prev => prev.map(t =>
+      t.id === id ? {
+        ...t,
         status: newStatus,
-        date: newStatus === 'paid' ? today : t.date 
+        date: newStatus === 'paid' ? today : t.date
       } : t
     ));
   };
@@ -138,11 +263,11 @@ const App: React.FC = () => {
       const recorder = new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
-      
-      recorder.ondataavailable = (e) => { 
-        if (e.data.size > 0) audioChunksRef.current.push(e.data); 
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
-      
+
       recorder.onstop = async () => {
         console.log("Recorder stopped, processing audio...");
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
@@ -150,7 +275,7 @@ const App: React.FC = () => {
         await processAudio(audioBlob);
         stream.getTracks().forEach(track => track.stop());
       };
-      
+
       recorder.start();
       setVoiceStatus('listening');
       console.log("Recording started");
@@ -172,10 +297,10 @@ const App: React.FC = () => {
   const processAudio = async (blob: Blob) => {
     console.log("Processing audio function called");
     setVoiceStatus('processing');
-    
+
     // Start timer to enforce minimum loading state
     const startTime = Date.now();
-    
+
     try {
       console.log("Audio Blob size:", blob.size);
       if (blob.size === 0) {
@@ -292,13 +417,13 @@ const App: React.FC = () => {
         else acc.pendingExpense += amount;
       }
       return acc;
-    }, { 
-      income: 0, 
-      expense: 0, 
-      paidIncome: 0, 
-      paidExpense: 0, 
-      pendingIncome: 0, 
-      pendingExpense: 0 
+    }, {
+      income: 0,
+      expense: 0,
+      paidIncome: 0,
+      paidExpense: 0,
+      pendingIncome: 0,
+      pendingExpense: 0
     });
   }, [monthFilteredTransactions]);
 
@@ -346,17 +471,30 @@ function doPost(e) {
             <div className="hidden sm:flex flex-col">
               <span className="font-bold text-base text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-1">
                 คุณยายดวง 👵
+                {activeSheet && (
+                  <span className="ml-1 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 text-[10px] font-bold border border-indigo-100 dark:border-indigo-800">
+                    {activeSheet.name}
+                  </span>
+                )}
               </span>
               <span className="text-[10px] text-indigo-500 font-medium -mt-1">ให้คุณยายช่วยจดจร้า</span>
             </div>
           </div>
           <div className="flex items-center gap-1 sm:gap-3">
-            <button 
+            <button
               onClick={() => setShowGuide(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] font-bold text-slate-500 transition-colors"
             >
-              <HelpCircle size={16} /> 
+              <HelpCircle size={16} />
               <span className="hidden xs:inline">คู่มือ</span>
+            </button>
+            <button
+              onClick={handlePull}
+              disabled={isLoading || !sheetUrl}
+              className={`p-2 rounded-xl transition-colors ${isLoading ? 'animate-spin text-indigo-500' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500'}`}
+              title="ดึงข้อมูลล่าสุด"
+            >
+              <RefreshCw size={20} />
             </button>
             <div className="h-4 w-px bg-slate-200 dark:bg-slate-800 hidden xs:block"></div>
             <button onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
@@ -397,16 +535,117 @@ function doPost(e) {
                     />
                   </div>
                   <div>
-                    <label className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">
-                      <RefreshCw size={12} /> Google Sheets Web App URL
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="https://script.google.com/macros/s/.../exec"
-                      className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                      value={sheetUrl}
-                      onChange={(e) => { setSheetUrl(e.target.value); localStorage.setItem('wealth_sheet_url', e.target.value); }}
-                    />
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">
+                        <Layout size={12} /> จัดการบัญชี (Google Sheets)
+                      </label>
+                    </div>
+
+                    {/* Sheet List */}
+                    <div className="space-y-2 mb-4">
+                      {sheets.map(sheet => (
+                        <div
+                          key={sheet.id}
+                          className={`flex flex-col gap-2 p-3 rounded-xl border transition-all ${activeSheetId === sheet.id
+                            ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-800'
+                            : 'bg-white border-slate-200 dark:bg-slate-800 dark:border-slate-700'
+                            }`}
+                        >
+                          {editingSheetId === sheet.id ? (
+                            <div className="space-y-2 w-full">
+                              <input
+                                type="text"
+                                placeholder="ชื่อบัญชี"
+                                className="w-full px-2 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                                value={editSheetName}
+                                onChange={(e) => setEditSheetName(e.target.value)}
+                              />
+                              <input
+                                type="text"
+                                placeholder="Web App URL"
+                                className="w-full px-2 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                                value={editSheetUrl}
+                                onChange={(e) => setEditSheetUrl(e.target.value)}
+                              />
+                              <div className="flex justify-end gap-2 mt-2">
+                                <button
+                                  onClick={handleCancelEdit}
+                                  className="p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
+                                >
+                                  <X size={16} />
+                                </button>
+                                <button
+                                  onClick={handleSaveSheet}
+                                  className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700"
+                                >
+                                  <Save size={14} /> บันทึก
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between w-full">
+                              <button
+                                onClick={() => setActiveSheetId(sheet.id)}
+                                className="flex-1 text-left flex items-center gap-3 min-w-0"
+                              >
+                                <div className={`flex-shrink-0 w-4 h-4 rounded-full border flex items-center justify-center ${activeSheetId === sheet.id
+                                  ? 'border-indigo-600 bg-indigo-600 text-white'
+                                  : 'border-slate-300 dark:border-slate-600'
+                                  }`}>
+                                  {activeSheetId === sheet.id && <Check size={10} />}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className={`text-sm font-bold truncate ${activeSheetId === sheet.id ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>
+                                    {sheet.name}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400 truncate max-w-[180px] font-mono">{sheet.url}</p>
+                                </div>
+                              </button>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <button
+                                  onClick={() => handleStartEdit(sheet)}
+                                  className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
+                                >
+                                  <Edit2 size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleRemoveSheet(sheet.id)}
+                                  className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Add New Sheet */}
+                    <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                      <p className="text-xs font-bold text-slate-500">เพิ่มบัญชีใหม่</p>
+                      <input
+                        type="text"
+                        placeholder="ชื่อบัญชี (เช่น ท่องเที่ยว, เงินออม)"
+                        className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                        value={newSheetName}
+                        onChange={(e) => setNewSheetName(e.target.value)}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Web App URL..."
+                        className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                        value={newSheetUrl}
+                        onChange={(e) => setNewSheetUrl(e.target.value)}
+                      />
+                      <button
+                        onClick={handleAddSheet}
+                        disabled={!newSheetName || !newSheetUrl}
+                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg disabled:opacity-50 transition-all"
+                      >
+                        เพิ่มบัญชี
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">
@@ -417,7 +656,11 @@ function doPost(e) {
                       placeholder="เช่น 15000"
                       className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                       value={monthlyBudget || ''}
-                      onChange={(e) => { setMonthlyBudget(Number(e.target.value)); localStorage.setItem('wealth_budget', e.target.value); }}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setSheets(prev => prev.map(s => s.id === activeSheetId ? { ...s, budget: val } : s));
+                      }}
+                      disabled={!activeSheetId}
                     />
                   </div>
                 </div>
@@ -432,10 +675,12 @@ function doPost(e) {
                     <p className="text-xs text-slate-500 mt-1 leading-relaxed">เพื่อให้คุณเป็นเจ้าของข้อมูลทั้งหมด และใช้งานโควตาฟรีส่วนตัวของคุณได้โดยตรง ไม่ต้องผ่านเซิร์ฟเวอร์กลาง</p>
                   </div>
                 </div>
-                <button 
-                  onClick={() => setShowSettings(false)} 
+
+
+                <button
+                  onClick={() => setShowSettings(false)}
                   disabled={!sheetUrl || !geminiApiKey}
-                  className="w-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-bold py-4 rounded-xl disabled:opacity-30 transition-all"
+                  className="w-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-bold py-4 rounded-xl disabled:opacity-30 transition-all mt-4"
                 >
                   บันทึกและเริ่มใช้งาน
                 </button>
@@ -461,7 +706,7 @@ function doPost(e) {
                 <X size={20} className="text-slate-400" />
               </button>
             </div>
-            
+
             <div className="p-8 overflow-y-auto max-h-[calc(90vh-100px)] custom-scrollbar">
               <div className="space-y-10 pb-10">
                 {/* Step 1 */}
@@ -472,7 +717,7 @@ function doPost(e) {
                   </div>
                   <div className="pl-11">
                     <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-4">
-                      ไปที่ <a href="https://sheets.new" target="_blank" className="text-indigo-600 font-bold hover:underline inline-flex items-center gap-1">sheets.new <ExternalLink size={12}/></a> และตั้งชื่อไฟล์ตามต้องการ
+                      ไปที่ <a href="https://sheets.new" target="_blank" className="text-indigo-600 font-bold hover:underline inline-flex items-center gap-1">sheets.new <ExternalLink size={12} /></a> และตั้งชื่อไฟล์ตามต้องการ
                     </p>
                   </div>
                 </section>
@@ -504,7 +749,7 @@ function doPost(e) {
                       <pre className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl text-[11px] overflow-x-auto border border-slate-200 dark:border-slate-800 font-mono text-slate-700 dark:text-slate-300">
                         {appScriptCode}
                       </pre>
-                      <button 
+                      <button
                         onClick={() => { navigator.clipboard.writeText(appScriptCode); alert("คัดลอกโค้ดแล้ว!"); }}
                         className="absolute top-2 right-2 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
                       >
@@ -545,7 +790,7 @@ function doPost(e) {
                     <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-4">
                       คัดลอก <b>Web App URL</b> (จะขึ้นต้นด้วย <code className="text-indigo-500">https://script.google.com/...</code>) นำมาวางในส่วนการตั้งค่าของแอปนี้
                     </p>
-                    <button 
+                    <button
                       onClick={() => { setShowGuide(false); setShowSettings(true); }}
                       className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg active:scale-95 transition-all"
                     >
@@ -572,7 +817,7 @@ function doPost(e) {
                 </div>
                 <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 backdrop-blur-md">
                   <Calendar size={12} className="text-white/60" />
-                  <select 
+                  <select
                     className="bg-transparent text-[10px] font-bold text-white outline-none cursor-pointer"
                     value={filterMonth}
                     onChange={(e) => {
@@ -596,19 +841,19 @@ function doPost(e) {
 
               {monthlyBudget > 0 && filterMonth !== 'all' && (
                 <div className="mb-6 space-y-2">
-                   <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-tighter text-indigo-100">
+                  <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-tighter text-indigo-100">
                     <span>งบประมาณคงเหลือ</span>
                     <span>{remainingBudget.toLocaleString()} / {monthlyBudget.toLocaleString()}</span>
                   </div>
                   <div className="h-2 bg-indigo-900/40 rounded-full overflow-hidden">
-                    <div 
+                    <div
                       className={`h-full transition-all duration-1000 ${budgetProgress > 90 ? 'bg-rose-400' : budgetProgress > 70 ? 'bg-amber-400' : 'bg-emerald-400'}`}
                       style={{ width: `${budgetProgress}%` }}
                     ></div>
                   </div>
                 </div>
               )}
-              
+
               <div className="space-y-3">
                 <div className="flex items-center justify-between bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 group-hover:bg-white/15 transition-all">
                   <div className="flex items-center gap-3">
@@ -646,7 +891,7 @@ function doPost(e) {
               </div>
 
               <div className="mt-8">
-                <button 
+                <button
                   onClick={() => setIsAddModalOpen(true)}
                   className="w-full flex items-center justify-center gap-3 py-4 bg-white text-indigo-600 font-bold rounded-2xl shadow-xl hover:bg-indigo-50 active:scale-95 transition-all"
                 >
@@ -678,7 +923,7 @@ function doPost(e) {
                 {voiceStatus === 'listening' ? (
                   <div className="space-y-4 py-2">
                     <div className="flex justify-center gap-1.5 h-10 items-center">
-                      {[1,2,3,4,5,6].map(i => <div key={i} className="w-1.5 bg-white rounded-full animate-bounce" style={{ height: `${20 + Math.random()*80}%`, animationDelay: `${i*0.08}s` }}></div>)}
+                      {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="w-1.5 bg-white rounded-full animate-bounce" style={{ height: `${20 + Math.random() * 80}%`, animationDelay: `${i * 0.08}s` }}></div>)}
                     </div>
                     <p className="text-sm font-medium animate-pulse">กำลังฟังเสียงของคุณ...</p>
                     <button onClick={stopRecording} className="mx-auto flex items-center gap-2 px-8 py-3 bg-rose-500 hover:bg-rose-600 rounded-2xl font-bold shadow-lg active:scale-95 transition-all"><Square size={18} /> หยุดและบันทึก</button>
@@ -686,7 +931,7 @@ function doPost(e) {
                 ) : voiceStatus === 'processing' ? (
                   <div className="space-y-4 py-4">
                     <div className="flex justify-center items-center h-12">
-                       <Loader2 size={40} className="text-indigo-200 animate-spin" />
+                      <Loader2 size={40} className="text-indigo-200 animate-spin" />
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm font-medium">กำลังคุยกับ Gemini...</p>
@@ -696,12 +941,12 @@ function doPost(e) {
                 ) : (
                   <div className="space-y-4 py-2">
                     <p className="text-sm text-indigo-50 italic opacity-80 leading-relaxed">
-                      "กินก๋วยเตี๋ยวไปห้าสิบบาท" <br/> 
+                      "กินก๋วยเตี๋ยวไปห้าสิบบาท" <br />
                       "ได้รับเงินเดือนสามหมื่นบาท"
                     </p>
-                    <button 
-                      onClick={startRecording} 
-                      disabled={voiceStatus === 'processing'} 
+                    <button
+                      onClick={startRecording}
+                      disabled={voiceStatus === 'processing'}
                       className="mx-auto flex items-center gap-3 px-10 py-4 bg-white text-indigo-600 hover:bg-indigo-50 rounded-2xl font-bold shadow-lg disabled:opacity-50 active:scale-95 transition-all"
                     >
                       <Mic size={22} /> กดเพื่อพูด
@@ -715,9 +960,9 @@ function doPost(e) {
               <Mic size={280} />
             </div>
           </div>
-          <TransactionList 
-            transactions={filteredTransactions} 
-            onDelete={handleDeleteTransaction} 
+          <TransactionList
+            transactions={filteredTransactions}
+            onDelete={handleDeleteTransaction}
             onUpdateStatus={handleUpdateStatus}
             onEditTransaction={setEditingTransaction}
             filterMonth={filterMonth}
@@ -751,19 +996,19 @@ function doPost(e) {
       {/* Transaction Modal (Add/Edit) */}
       {(isAddModalOpen || editingTransaction) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div 
-            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300" 
+          <div
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300"
             onClick={() => { setIsAddModalOpen(false); setEditingTransaction(null); }}
           />
           <div className="relative w-full max-w-lg animate-in zoom-in-95 duration-200">
-            <button 
+            <button
               onClick={() => { setIsAddModalOpen(false); setEditingTransaction(null); }}
               className="absolute -top-12 right-0 p-2 text-white/70 hover:text-white transition-colors"
             >
               <X size={24} />
             </button>
-            <TransactionForm 
-              onAdd={handleAddTransaction} 
+            <TransactionForm
+              onAdd={handleAddTransaction}
               onUpdate={handleUpdateTransaction}
               initialData={editingTransaction || undefined}
               onClose={() => { setIsAddModalOpen(false); setEditingTransaction(null); }}
