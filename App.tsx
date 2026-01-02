@@ -430,34 +430,107 @@ const App: React.FC = () => {
   const remainingBudget = monthlyBudget > 0 ? monthlyBudget - totals.expense : 0;
   const budgetProgress = monthlyBudget > 0 ? Math.min((totals.expense / monthlyBudget) * 100, 100) : 0;
 
-  const appScriptCode = `function doGet(e) {
+  const appScriptCode = `// 1. READ DATA (doGet)
+function doGet(e) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  var data = sheet.getDataRange().getValues();
-  var result = [];
-  var headers = data[0];
-  for (var i = 1; i < data.length; i++) {
-    var obj = {};
-    for (var j = 0; j < headers.length; j++) {
-      obj[headers[j]] = data[i][j];
-    }
-    result.push(obj);
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) {
+    return ContentService.createTextOutput(JSON.stringify({ error: "Server busy" })).setMimeType(ContentService.MimeType.JSON);
   }
-  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+  
+  try {
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+    var headers = [];
+    var result = [];
+    if (lastRow > 0) {
+      headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+      if (lastRow > 1) {
+        var values = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+        result = values.map(function(row) {
+          var obj = {};
+          headers.forEach(function(h, i) {
+            obj[h] = row[i];
+          });
+          return obj;
+        });
+      }
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+  } catch (e) {
+    return ContentService.createTextOutput(JSON.stringify({ error: e.toString() })).setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
+// 2. WRITE DATA (doPost)
 function doPost(e) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  var data = JSON.parse(e.postData.contents);
-  sheet.clear();
-  if (data.length > 0) {
-    var headers = Object.keys(data[0]);
-    sheet.appendRow(headers);
-    data.forEach(function(row) {
-      var values = headers.map(function(h) { return row[h]; });
-      sheet.appendRow(values);
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var incomingData = JSON.parse(e.postData.contents);
+    
+    // 1. Headers
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+    var existingHeaders = [];
+    
+    if (lastRow === 0) {
+      existingHeaders = Object.keys(incomingData[0]);
+      sheet.appendRow(existingHeaders);
+      lastCol = existingHeaders.length;
+    } else {
+      existingHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    }
+    // 2. Map Headers
+    var headerMap = {};
+    existingHeaders.forEach(function(h, i) { headerMap[h] = i; });
+    // 3. Map Existing IDs
+    var idMap = {};
+    var idColIdx = headerMap['id'];
+    var existingData = [];
+    if (lastRow > 1) {
+      existingData = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+      if (idColIdx !== undefined) {
+        existingData.forEach(function(row, i) {
+          var id = String(row[idColIdx]);
+          if (id) idMap[id] = i; 
+        });
+      }
+    }
+    // 4. Process Incoming Data
+    var processedRowIndices = new Set(); 
+    incomingData.forEach(function(item) {
+      var itemId = String(item.id);
+      
+      var rowValues = existingHeaders.map(function(header) {
+        return item[header] !== undefined ? item[header] : "";
+      });
+      if (itemId in idMap) {
+        // UPDATE existing row
+        var rowIndex = idMap[itemId];
+        sheet.getRange(rowIndex + 2, 1, 1, rowValues.length).setValues([rowValues]);
+        processedRowIndices.add(rowIndex);
+      } else {
+        // INSERT new row
+        sheet.appendRow(rowValues);
+      }
     });
+    // 5. DELETE removed rows
+    for (var i = existingData.length - 1; i >= 0; i--) {
+      if (!processedRowIndices.has(i)) {
+        sheet.deleteRow(i + 2);
+      }
+    }
+    return ContentService.createTextOutput("Success");
+  } catch (e) {
+    return ContentService.createTextOutput("Error: " + e.toString());
+  } finally {
+    lock.releaseLock();
   }
-  return ContentService.createTextOutput("Success");
 }`;
 
   return (
