@@ -6,7 +6,7 @@ import CategoryBreakdown from './components/CategoryBreakdown';
 import { processVoiceCommand } from './services/geminiService';
 import { syncToSheets, fetchFromSheets } from './services/sheetsService';
 import { Transaction, TransactionStatus, TransactionType, SheetConfig } from './types';
-import { Wallet, TrendingUp, TrendingDown, Sparkles, RefreshCw, Settings, Info, AlertCircle, CheckCircle2, Moon, Sun, Mic, Square, Loader2, Key, Calendar, Target, PieChart, Clock, Plus, X, HelpCircle, Code, Copy, ExternalLink, ChevronRight, Trash2, Check, Layout, Edit2, Save } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, Sparkles, RefreshCw, Settings, Info, AlertCircle, CheckCircle2, Moon, Sun, Mic, Square, Loader2, Key, Calendar, Target, PieChart, Clock, Plus, X, HelpCircle, Code, Copy, ExternalLink, ChevronRight, Trash2, Check, Layout, Edit2, Save, Menu } from 'lucide-react';
 import { MONTHS_THAI } from './constants';
 
 const App: React.FC = () => {
@@ -43,16 +43,19 @@ const App: React.FC = () => {
 
   const [showSettings, setShowSettings] = useState(!sheetUrl || !localStorage.getItem('wealth_gemini_key'));
   const [showGuide, setShowGuide] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(localStorage.getItem('theme') === 'dark');
 
   // New Sheet Form State
   const [newSheetName, setNewSheetName] = useState('');
   const [newSheetUrl, setNewSheetUrl] = useState('');
+  const [newSheetBudget, setNewSheetBudget] = useState<string>('');
 
   // Edit Sheet State
   const [editingSheetId, setEditingSheetId] = useState<string | null>(null);
   const [editSheetName, setEditSheetName] = useState('');
   const [editSheetUrl, setEditSheetUrl] = useState('');
+  const [editSheetBudget, setEditSheetBudget] = useState<string>('');
 
   // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -145,11 +148,13 @@ const App: React.FC = () => {
     const newSheet: SheetConfig = {
       id: crypto.randomUUID(),
       name: newSheetName,
-      url: newSheetUrl
+      url: newSheetUrl,
+      budget: Number(newSheetBudget) || 0
     };
     setSheets(prev => [...prev, newSheet]);
     setNewSheetName('');
     setNewSheetUrl('');
+    setNewSheetBudget('');
     // If it's the first sheet, auto-select it
     if (sheets.length === 0) {
       setActiveSheetId(newSheet.id);
@@ -169,12 +174,14 @@ const App: React.FC = () => {
     setEditingSheetId(sheet.id);
     setEditSheetName(sheet.name);
     setEditSheetUrl(sheet.url);
+    setEditSheetBudget(sheet.budget ? String(sheet.budget) : '');
   };
 
   const handleCancelEdit = () => {
     setEditingSheetId(null);
     setEditSheetName('');
     setEditSheetUrl('');
+    setEditSheetBudget('');
   };
 
   const handleSaveSheet = () => {
@@ -182,7 +189,7 @@ const App: React.FC = () => {
 
     setSheets(prev => prev.map(s =>
       s.id === editingSheetId
-        ? { ...s, name: editSheetName, url: editSheetUrl }
+        ? { ...s, name: editSheetName, url: editSheetUrl, budget: Number(editSheetBudget) || 0 }
         : s
     ));
 
@@ -538,8 +545,19 @@ function doPost(e) {
       <nav className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 transition-colors">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-indigo-600 rounded-lg text-white">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-2 -ml-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg sm:hidden"
+            >
+              <Menu size={24} />
+            </button>
+            <div className="hidden sm:block p-2 bg-indigo-600 rounded-lg text-white">
               <Wallet size={20} />
+            </div>
+            <div className="flex flex-col sm:hidden">
+              <span className="font-bold text-base text-slate-800 dark:text-slate-100 tracking-tight">
+                คุณยายดวง 👵
+              </span>
             </div>
             <div className="hidden sm:flex flex-col">
               <span className="font-bold text-base text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-1">
@@ -554,31 +572,168 @@ function doPost(e) {
             </div>
           </div>
           <div className="flex items-center gap-1 sm:gap-3">
-            <button
-              onClick={() => setShowGuide(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] font-bold text-slate-500 transition-colors"
-            >
-              <HelpCircle size={16} />
-              <span className="hidden xs:inline">คู่มือ</span>
-            </button>
-            <button
-              onClick={handlePull}
-              disabled={isLoading || !sheetUrl}
-              className={`p-2 rounded-xl transition-colors ${isLoading ? 'animate-spin text-indigo-500' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500'}`}
-              title="ดึงข้อมูลล่าสุด"
-            >
-              <RefreshCw size={20} />
-            </button>
-            <div className="h-4 w-px bg-slate-200 dark:bg-slate-800 hidden xs:block"></div>
+            <div className="hidden sm:flex items-center gap-1 sm:gap-3">
+              <button
+                onClick={() => setShowGuide(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] font-bold text-slate-500 transition-colors"
+              >
+                <HelpCircle size={16} />
+                <span className="hidden xs:inline">คู่มือ</span>
+              </button>
+              <button
+                onClick={handlePull}
+                disabled={isLoading || !sheetUrl}
+                className={`p-2 rounded-xl transition-colors ${isLoading ? 'animate-spin text-indigo-500' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500'}`}
+                title="ดึงข้อมูลล่าสุด"
+              >
+                <RefreshCw size={20} />
+              </button>
+              <div className="h-4 w-px bg-slate-200 dark:bg-slate-800 hidden xs:block"></div>
+            </div>
+            
             <button onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
               {darkMode ? <Sun size={20} /> : <Moon size={20} />}
             </button>
-            <button onClick={() => setShowSettings(!showSettings)} className={`p-2 rounded-xl transition-all ${showSettings ? 'bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
+            
+            <button onClick={() => setShowSettings(!showSettings)} className={`hidden sm:block p-2 rounded-xl transition-all ${showSettings ? 'bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
               <Settings size={20} />
             </button>
           </div>
         </div>
       </nav>
+
+      {/* Mobile Sidebar */}
+      <div 
+        className={`fixed inset-0 z-50 sm:hidden transition-all duration-300 ${
+          isSidebarOpen ? 'pointer-events-auto' : 'pointer-events-none'
+        }`}
+      >
+        <div
+          className={`absolute inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity duration-300 ${
+            isSidebarOpen ? 'opacity-100' : 'opacity-0'
+          }`}
+          onClick={() => setIsSidebarOpen(false)}
+        />
+        <div 
+          className={`absolute left-0 top-0 bottom-0 w-[280px] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-xl flex flex-col transition-transform duration-300 ease-out ${
+            isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-indigo-600 rounded-lg text-white">
+                <Wallet size={20} />
+              </div>
+              <span className="font-bold text-lg text-slate-800 dark:text-slate-100">เมนูหลัก</span>
+            </div>
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="p-4 flex-1 overflow-y-auto">
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-3 px-1">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">บัญชีของคุณ</h3>
+                <button 
+                  onClick={() => { setShowSettings(true); setIsSidebarOpen(false); }}
+                  className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded-md"
+                >
+                  จัดการ
+                </button>
+              </div>
+              <div className="space-y-2">
+                {sheets.map(sheet => (
+                  <button
+                    key={sheet.id}
+                    onClick={() => {
+                      setActiveSheetId(sheet.id);
+                      setIsSidebarOpen(false);
+                    }}
+                    className={`w-full text-left p-3 rounded-xl border transition-all ${
+                      activeSheetId === sheet.id
+                        ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-800 ring-1 ring-indigo-500/20 shadow-sm'
+                        : 'bg-white border-slate-100 dark:bg-slate-800/50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`font-bold text-sm truncate ${activeSheetId === sheet.id ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>
+                        {sheet.name}
+                      </span>
+                      {activeSheetId === sheet.id && <div className="w-2 h-2 rounded-full bg-indigo-500"></div>}
+                    </div>
+                    <div className="flex justify-between items-center">
+                       <p className="text-[10px] text-slate-400 truncate font-mono max-w-[150px]">{sheet.url}</p>
+                       <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                        {sheet.budget ? `${sheet.budget.toLocaleString()} ฿` : '-'}
+                       </p>
+                    </div>
+                  </button>
+                ))}
+                
+                {sheets.length === 0 && (
+                  <div className="p-4 text-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
+                    <p className="text-xs text-slate-400 mb-2">ยังไม่มีบัญชี</p>
+                    <button
+                      onClick={() => { setShowSettings(true); setIsSidebarOpen(false); }}
+                      className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center justify-center gap-1"
+                    >
+                      <Plus size={14} /> เพิ่มบัญชี
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <button
+                onClick={() => {
+                  handlePull();
+                  setIsSidebarOpen(false);
+                }}
+                disabled={isLoading || !sheetUrl}
+                className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw size={20} className={isLoading ? 'animate-spin' : ''} />
+                <span className="font-medium">ดึงข้อมูลล่าสุด</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowSettings(true);
+                  setIsSidebarOpen(false);
+                }}
+                className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors"
+              >
+                <Settings size={20} />
+                <span className="font-medium">ตั้งค่า & จัดการบัญชี</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowGuide(true);
+                  setIsSidebarOpen(false);
+                }}
+                className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors"
+              >
+                <HelpCircle size={20} />
+                <span className="font-medium">คู่มือการใช้งาน</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 border-t border-slate-200 dark:border-slate-800">
+            <p className="text-center text-xs text-slate-400">
+              คุณยายดวง v1.0.0
+              <br />
+              ให้คุณยายช่วยจดจร้า
+            </p>
+          </div>
+        </div>
+      </div>
 
       {showSettings && (
         <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 animate-in slide-in-from-top duration-300">
@@ -591,7 +746,7 @@ function doPost(e) {
                     การตั้งค่าแอป
                   </h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400">
-                    ข้อมูลของคุณจะถูกเก็บไว้ในเบราว์เซอร์นี้และ Google Sheet ของคุณเท่านั้น มีความเป็นส่วนตัว 100%
+                    ข้อมูลของคุณจัดเก็บใน <span className="inline-flex items-center gap-1 font-medium text-slate-600 dark:text-slate-300"><img src="https://www.gstatic.com/images/branding/product/2x/sheets_2020q4_48dp.png" alt="Google Sheets" className="w-4 h-4" /> Google Sheet</span> ของคุณเท่านั้น มีความเป็นส่วนตัว 100% การจัดการข้อมูลดำเนินการผ่าน <span className="inline-flex items-center gap-1 font-medium text-slate-600 dark:text-slate-300"><img src="https://www.gstatic.com/images/branding/product/2x/apps_script_48dp.png" alt="Google Apps Script" className="w-4 h-4" /> Google Apps Script</span>
                   </p>
                 </div>
                 <div className="space-y-4">
@@ -635,10 +790,17 @@ function doPost(e) {
                               />
                               <input
                                 type="text"
-                                placeholder="Web App URL"
+                                placeholder="Google Appscript URL"
                                 className="w-full px-2 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                                 value={editSheetUrl}
                                 onChange={(e) => setEditSheetUrl(e.target.value)}
+                              />
+                              <input
+                                type="number"
+                                placeholder="งบประมาณ (บาท)"
+                                className="w-full px-2 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                                value={editSheetBudget}
+                                onChange={(e) => setEditSheetBudget(e.target.value)}
                               />
                               <div className="flex justify-end gap-2 mt-2">
                                 <button
@@ -671,7 +833,12 @@ function doPost(e) {
                                   <p className={`text-sm font-bold truncate ${activeSheetId === sheet.id ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>
                                     {sheet.name}
                                   </p>
-                                  <p className="text-[10px] text-slate-400 truncate max-w-[180px] font-mono">{sheet.url}</p>
+                                  <div className="flex flex-col">
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                                      งบ: {sheet.budget?.toLocaleString() || 0} ฿
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 truncate max-w-[180px] font-mono opacity-70">{sheet.url}</p>
+                                  </div>
                                 </div>
                               </button>
                               <div className="flex items-center gap-1 flex-shrink-0">
@@ -711,6 +878,13 @@ function doPost(e) {
                         value={newSheetUrl}
                         onChange={(e) => setNewSheetUrl(e.target.value)}
                       />
+                      <input
+                        type="number"
+                        placeholder="งบประมาณ (บาท)"
+                        className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                        value={newSheetBudget}
+                        onChange={(e) => setNewSheetBudget(e.target.value)}
+                      />
                       <button
                         onClick={handleAddSheet}
                         disabled={!newSheetName || !newSheetUrl}
@@ -719,22 +893,6 @@ function doPost(e) {
                         เพิ่มบัญชี
                       </button>
                     </div>
-                  </div>
-                  <div>
-                    <label className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">
-                      <Target size={12} /> งบประมาณรายเดือน (บาท)
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="เช่น 15000"
-                      className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                      value={monthlyBudget || ''}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        setSheets(prev => prev.map(s => s.id === activeSheetId ? { ...s, budget: val } : s));
-                      }}
-                      disabled={!activeSheetId}
-                    />
                   </div>
                 </div>
               </div>
@@ -752,7 +910,7 @@ function doPost(e) {
 
                 <button
                   onClick={() => setShowSettings(false)}
-                  disabled={!sheetUrl || !geminiApiKey}
+                  disabled={!sheetUrl}
                   className="w-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-bold py-4 rounded-xl disabled:opacity-30 transition-all mt-4"
                 >
                   บันทึกและเริ่มใช้งาน
@@ -861,7 +1019,7 @@ function doPost(e) {
                   </div>
                   <div className="pl-11">
                     <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-4">
-                      คัดลอก <b>Web App URL</b> (จะขึ้นต้นด้วย <code className="text-indigo-500">https://script.google.com/...</code>) นำมาวางในส่วนการตั้งค่าของแอปนี้
+                      คัดลอก <b>   placeholder="Google Appscript URL"</b> (จะขึ้นต้นด้วย <code className="text-indigo-500">https://script.google.com/...</code>) นำมาวางในส่วนการตั้งค่าของแอปนี้
                     </p>
                     <button
                       onClick={() => { setShowGuide(false); setShowSettings(true); }}
@@ -980,59 +1138,61 @@ function doPost(e) {
         </div>
 
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-gradient-to-br from-indigo-500 to-purple-600 dark:from-indigo-800 dark:to-purple-900 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden transition-all">
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm"><Mic size={24} /></div>
-                  <div>
-                    <h3 className="text-xl font-bold">ผู้ช่วยเสียงอัจฉริยะ</h3>
-                    <p className="text-indigo-100/80 text-xs">บันทึกรายการด้วยเสียง (ภาษาไทย)</p>
+          {geminiApiKey && (
+            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 dark:from-indigo-800 dark:to-purple-900 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden transition-all">
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm"><Mic size={24} /></div>
+                    <div>
+                      <h3 className="text-xl font-bold">ผู้ช่วยเสียงอัจฉริยะ</h3>
+                      <p className="text-indigo-100/80 text-xs">บันทึกรายการด้วยเสียง (ภาษาไทย)</p>
+                    </div>
                   </div>
+                  {voiceStatus === 'processing' && <Loader2 size={24} className="animate-spin text-white/50" />}
                 </div>
-                {voiceStatus === 'processing' && <Loader2 size={24} className="animate-spin text-white/50" />}
+                <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/10 mb-6 text-center shadow-inner">
+                  {voiceStatus === 'listening' ? (
+                    <div className="space-y-4 py-2">
+                      <div className="flex justify-center gap-1.5 h-10 items-center">
+                        {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="w-1.5 bg-white rounded-full animate-bounce" style={{ height: `${20 + Math.random() * 80}%`, animationDelay: `${i * 0.08}s` }}></div>)}
+                      </div>
+                      <p className="text-sm font-medium animate-pulse">กำลังฟังเสียงของคุณ...</p>
+                      <button onClick={stopRecording} className="mx-auto flex items-center gap-2 px-8 py-3 bg-rose-500 hover:bg-rose-600 rounded-2xl font-bold shadow-lg active:scale-95 transition-all"><Square size={18} /> หยุดและบันทึก</button>
+                    </div>
+                  ) : voiceStatus === 'processing' ? (
+                    <div className="space-y-4 py-4">
+                      <div className="flex justify-center items-center h-12">
+                        <Loader2 size={40} className="text-indigo-200 animate-spin" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">กำลังคุยกับ Gemini...</p>
+                        <p className="text-xs text-indigo-200/60">ระบบกำลังวิเคราะห์ข้อมูลรายรับ-รายจ่ายของคุณ</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 py-2">
+                      <p className="text-sm text-indigo-50 italic opacity-80 leading-relaxed">
+                        "กินก๋วยเตี๋ยวไปห้าสิบบาท" <br />
+                        "ได้รับเงินเดือนสามหมื่นบาท"
+                      </p>
+                      <button
+                        onClick={startRecording}
+                        disabled={voiceStatus === 'processing'}
+                        className="mx-auto flex items-center gap-3 px-10 py-4 bg-white text-indigo-600 hover:bg-indigo-50 rounded-2xl font-bold shadow-lg disabled:opacity-50 active:scale-95 transition-all"
+                      >
+                        <Mic size={22} /> กดเพื่อพูด
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-indigo-200/60"><Sparkles size={12} /> ขับเคลื่อนด้วย Gemini Flash</div>
               </div>
-              <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/10 mb-6 text-center shadow-inner">
-                {voiceStatus === 'listening' ? (
-                  <div className="space-y-4 py-2">
-                    <div className="flex justify-center gap-1.5 h-10 items-center">
-                      {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="w-1.5 bg-white rounded-full animate-bounce" style={{ height: `${20 + Math.random() * 80}%`, animationDelay: `${i * 0.08}s` }}></div>)}
-                    </div>
-                    <p className="text-sm font-medium animate-pulse">กำลังฟังเสียงของคุณ...</p>
-                    <button onClick={stopRecording} className="mx-auto flex items-center gap-2 px-8 py-3 bg-rose-500 hover:bg-rose-600 rounded-2xl font-bold shadow-lg active:scale-95 transition-all"><Square size={18} /> หยุดและบันทึก</button>
-                  </div>
-                ) : voiceStatus === 'processing' ? (
-                  <div className="space-y-4 py-4">
-                    <div className="flex justify-center items-center h-12">
-                      <Loader2 size={40} className="text-indigo-200 animate-spin" />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">กำลังคุยกับ Gemini...</p>
-                      <p className="text-xs text-indigo-200/60">ระบบกำลังวิเคราะห์ข้อมูลรายรับ-รายจ่ายของคุณ</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4 py-2">
-                    <p className="text-sm text-indigo-50 italic opacity-80 leading-relaxed">
-                      "กินก๋วยเตี๋ยวไปห้าสิบบาท" <br />
-                      "ได้รับเงินเดือนสามหมื่นบาท"
-                    </p>
-                    <button
-                      onClick={startRecording}
-                      disabled={voiceStatus === 'processing'}
-                      className="mx-auto flex items-center gap-3 px-10 py-4 bg-white text-indigo-600 hover:bg-indigo-50 rounded-2xl font-bold shadow-lg disabled:opacity-50 active:scale-95 transition-all"
-                    >
-                      <Mic size={22} /> กดเพื่อพูด
-                    </button>
-                  </div>
-                )}
+              <div className="absolute -right-16 -bottom-16 text-white/5 rotate-45">
+                <Mic size={280} />
               </div>
-              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-indigo-200/60"><Sparkles size={12} /> ขับเคลื่อนด้วย Gemini Flash</div>
             </div>
-            <div className="absolute -right-16 -bottom-16 text-white/5 rotate-45">
-              <Mic size={280} />
-            </div>
-          </div>
+          )}
           <TransactionList
             transactions={filteredTransactions}
             onDelete={handleDeleteTransaction}
