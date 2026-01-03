@@ -21,7 +21,7 @@ const LoginPage: React.FC = () => {
             <Wallet size={48} />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">คุณยายดวง</h1>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Nanywallet</h1>
             <p className="text-slate-500 dark:text-slate-400">ผู้ช่วยจดรายรับ-รายจ่าย อัจฉริยะ</p>
           </div>
         </div>
@@ -54,9 +54,9 @@ const LoginPage: React.FC = () => {
             )}
           </button>
         </div>
-        
+
         <p className="text-xs text-slate-400">
-          โดยการเข้าสู่ระบบ คุณยอมรับเงื่อนไขการใช้งาน <br/>
+          โดยการเข้าสู่ระบบ คุณยอมรับเงื่อนไขการใช้งาน <br />
           และอนุญาตให้แอปจัดการไฟล์ Google Sheets ของคุณ
         </p>
       </div>

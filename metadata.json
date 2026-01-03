@@ -1,7 +1,6 @@
-
 {
-  "name": "คุณยายดวง",
-  "description": "ระบบจัดการรายรับ-รายจ่ายอัจฉริยะสำหรับคุณยายดวง รองรับคำสั่งเสียงภาษาไทยและซิงค์ข้อมูลผ่าน Google Sheets",
+  "name": "Nanywallet",
+  "description": "ระบบจัดการรายรับ-รายจ่ายอัจฉริยะสำหรับNanywallet รองรับคำสั่งเสียงภาษาไทยและซิงค์ข้อมูลผ่าน Google Sheets",
   "requestFramePermissions": [
     "microphone"
   ]
