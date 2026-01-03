@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Transaction, TransactionStatus, TransactionType } from '../types';
 import { Trash2, Coffee, Home, Car, Heart, ShoppingBag, Briefcase, Gift, Layers, CheckCircle, Calendar, Filter, CreditCard, ArrowDownCircle, Edit2, Play, TrendingUp } from 'lucide-react';

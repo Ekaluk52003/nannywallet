@@ -30,3 +30,8 @@ export interface SheetConfig {
   url: string;
   budget?: number;
 }
+
+export interface Wallet {
+  id: string;
+  name: string;
+}

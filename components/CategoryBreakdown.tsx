@@ -43,7 +43,7 @@ const CategoryBreakdown: React.FC<Props> = ({ transactions }) => {
     }, {} as Record<string, number>);
 
     return Object.entries(breakdown)
-      .map(([category, amount]) => ({
+      .map(([category, amount]: [string, number]) => ({
         category,
         amount,
         percentage: total > 0 ? (amount / total) * 100 : 0,
