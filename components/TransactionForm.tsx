@@ -9,13 +9,14 @@ interface Props {
   onUpdate?: (transaction: Transaction) => void;
   initialData?: Transaction;
   onClose?: () => void;
+  currencySymbol: string;
 }
 
-const TransactionForm: React.FC<Props> = ({ onAdd, onUpdate, initialData, onClose }) => {
+const TransactionForm: React.FC<Props> = ({ onAdd, onUpdate, initialData, onClose, currencySymbol }) => {
   const [type, setType] = useState<TransactionType>(initialData?.type || 'expense');
   const [amount, setAmount] = useState(initialData?.amount?.toString() || '');
   const [category, setCategory] = useState(initialData?.category || EXPENSE_CATEGORIES[0]);
-  
+
   // Helper to get local date string YYYY-MM-DD
   const getLocalDate = () => {
     const d = new Date();
@@ -45,7 +46,7 @@ const TransactionForm: React.FC<Props> = ({ onAdd, onUpdate, initialData, onClos
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-      alert("กรุณากรอกจำนวนเงินที่ถูกต้อง");
+      alert("Please enter a valid amount");
       return;
     }
 
@@ -64,7 +65,7 @@ const TransactionForm: React.FC<Props> = ({ onAdd, onUpdate, initialData, onClos
     } else {
       onAdd(tx);
     }
-    
+
     if (!isEditing) {
       setAmount('');
       setDescription('');
@@ -87,7 +88,7 @@ const TransactionForm: React.FC<Props> = ({ onAdd, onUpdate, initialData, onClos
     <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-slate-700 transition-colors w-full overflow-hidden">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">
-          {isEditing ? 'แก้ไขรายการ' : 'เพิ่มรายการใหม่'}
+          {isEditing ? 'Edit Transaction' : 'New Transaction'}
         </h3>
         {onClose && (
           <button type="button" onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors sm:hidden">
@@ -95,29 +96,29 @@ const TransactionForm: React.FC<Props> = ({ onAdd, onUpdate, initialData, onClos
           </button>
         )}
       </div>
-      
+
       <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-2xl mb-6">
         <button
           type="button"
           onClick={() => handleTypeChange('expense')}
           className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${type === 'expense' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
         >
-          รายจ่าย
+          Expense
         </button>
         <button
           type="button"
           onClick={() => handleTypeChange('income')}
           className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${type === 'income' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
         >
-          รายรับ
+          Income
         </button>
       </div>
 
       <div className="space-y-6">
         <div>
-          <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 ml-1">จำนวนเงิน</label>
+          <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 ml-1">Amount</label>
           <div className="relative">
-            <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xl">฿</span>
+            <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xl">{currencySymbol}</span>
             <input
               type="number"
               required
@@ -132,7 +133,7 @@ const TransactionForm: React.FC<Props> = ({ onAdd, onUpdate, initialData, onClos
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 ml-1">หมวดหมู่</label>
+            <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 ml-1">Category</label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
@@ -142,7 +143,7 @@ const TransactionForm: React.FC<Props> = ({ onAdd, onUpdate, initialData, onClos
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 ml-1">วันที่</label>
+            <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 ml-1">Date</label>
             <input
               type="date"
               required
@@ -154,43 +155,43 @@ const TransactionForm: React.FC<Props> = ({ onAdd, onUpdate, initialData, onClos
         </div>
 
         <div>
-          <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 ml-1">สถานะ</label>
+          <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 ml-1">Status</label>
           <div className="flex gap-3">
             <button
               type="button"
               onClick={() => setStatus('paid')}
               className={`flex-1 flex items-center justify-center gap-2 py-4 px-3 rounded-2xl border-2 text-xs font-bold transition-all ${status === 'paid' ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-700 text-slate-400'}`}
             >
-              <CheckCircle size={16} /> {type === 'expense' ? 'จ่ายแล้ว' : 'รับแล้ว'}
+              <CheckCircle size={16} /> {type === 'expense' ? 'Paid' : 'Received'}
             </button>
             <button
               type="button"
               onClick={() => setStatus('pending')}
               className={`flex-1 flex items-center justify-center gap-2 py-4 px-3 rounded-2xl border-2 text-xs font-bold transition-all ${status === 'pending' ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-500 text-amber-600 dark:text-amber-400' : 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-700 text-slate-400'}`}
             >
-              <Clock size={16} /> {type === 'expense' ? 'ค้างจ่าย' : 'ค้างรับ'}
+              <Clock size={16} /> {type === 'expense' ? 'Pending' : 'Pending'}
             </button>
           </div>
         </div>
 
         <div>
-          <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 ml-1">คำอธิบาย</label>
+          <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 ml-1">Description</label>
           <input
             type="text"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="เช่น ค่าอาหารกลางวัน"
+            placeholder="e.g. Lunch"
             className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm font-medium text-slate-900 dark:text-white"
           />
         </div>
 
         <div className="pt-2">
-          <button 
+          <button
             type="submit"
             className={`w-full flex items-center justify-center gap-3 py-5 rounded-2xl font-bold transition-all shadow-xl active:scale-95 ${type === 'income' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
           >
             {isEditing ? <Save size={20} /> : <PlusCircle size={20} />}
-            {isEditing ? 'บันทึกการแก้ไข' : `บันทึก${type === 'income' ? 'รายรับ' : 'รายจ่าย'}`}
+            {isEditing ? 'Save Changes' : `Save ${type === 'income' ? 'Income' : 'Expense'}`}
           </button>
         </div>
       </div>

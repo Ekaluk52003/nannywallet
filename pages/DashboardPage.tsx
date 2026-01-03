@@ -20,7 +20,7 @@ import {
   Settings, CheckCircle2, Moon, Sun, Mic, Square, Loader2,
   Key, Calendar, Plus, X, LogOut, User, ChevronDown, PlusCircle, Menu, ExternalLink
 } from 'lucide-react';
-import { MONTHS_THAI } from '../constants';
+import { MONTHS, CURRENCIES } from '../constants';
 
 const DashboardPage: React.FC = () => {
   const { user, accessToken, logout } = useAuth();
@@ -54,6 +54,10 @@ const DashboardPage: React.FC = () => {
 
   // Voice Recording State
   const [voiceStatus, setVoiceStatus] = useState<'idle' | 'listening' | 'processing'>('idle');
+
+  // Currency State
+  const [currencyCode, setCurrencyCode] = useState(localStorage.getItem('currency_code') || 'THB');
+  const currencySymbol = CURRENCIES.find(c => c.code === currencyCode)?.symbol || '฿';
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
@@ -94,7 +98,7 @@ const DashboardPage: React.FC = () => {
         }
       } catch (error) {
         console.error("Failed to list wallets", error);
-        alert("ไม่สามารถดึงข้อมูลกระเป๋าเงินได้");
+        alert("Failed to fetch wallets");
       } finally {
         setIsLoading(false);
       }
@@ -125,7 +129,7 @@ const DashboardPage: React.FC = () => {
       setTransactions(mappedTransactions.sort((a, b) => b.date.localeCompare(a.date)));
     } catch (error) {
       console.error("Failed to load transactions", error);
-      alert("ไม่สามารถดึงข้อมูลธุรกรรมได้");
+      alert("Failed to fetch transactions");
     } finally {
       setIsLoading(false);
     }
@@ -149,7 +153,7 @@ const DashboardPage: React.FC = () => {
       setNewWalletName('');
     } catch (error) {
       console.error("Failed to create wallet", error);
-      alert("สร้างกระเป๋าเงินไม่สำเร็จ");
+      alert("Failed to create wallet");
     } finally {
       setIsCreatingWallet(false);
     }
@@ -181,12 +185,12 @@ const DashboardPage: React.FC = () => {
       await appendTransaction(accessToken, currentWallet.id, sheetTx);
     } catch (error) {
       console.error("Failed to add transaction", error);
-      alert("บันทึกลง Google Sheet ไม่สำเร็จ แต่แสดงผลในแอปแล้ว");
+      alert("Failed to save to Google Sheet, but displayed locally.");
     }
   };
 
   const handleDeleteTransaction = async (id: string) => {
-    if (!confirm('คุณแน่ใจหรือไม่ที่จะลบรายการนี้?')) return;
+    if (!confirm('Are you sure you want to delete this transaction?')) return;
     if (!accessToken || !currentWallet) return;
 
     // Optimistic Update
@@ -196,7 +200,7 @@ const DashboardPage: React.FC = () => {
       await deleteTransaction(accessToken, currentWallet.id, id);
     } catch (error) {
       console.error("Failed to delete transaction", error);
-      alert("ลบข้อมูลจาก Google Sheet ไม่สำเร็จ");
+      alert("Failed to delete from Google Sheet");
     }
   };
 
@@ -219,7 +223,7 @@ const DashboardPage: React.FC = () => {
       await updateTransaction(accessToken, currentWallet.id, sheetTx);
     } catch (error) {
       console.error("Failed to update transaction", error);
-      alert("อัปเดตข้อมูลลง Google Sheet ไม่สำเร็จ");
+      alert("Failed to update Google Sheet");
     }
   };
 
@@ -257,7 +261,7 @@ const DashboardPage: React.FC = () => {
   // --- Voice Logic (Preserved) ---
   const startRecording = async () => {
     if (!geminiApiKey) {
-      alert("กรุณาระบุ Gemini API Key ในส่วนการตั้งค่าก่อนใช้งานผู้ช่วยเสียง");
+      alert("Please provide Gemini API Key in settings to use Voice Assistant");
       setShowSettings(true);
       return;
     }
@@ -281,7 +285,7 @@ const DashboardPage: React.FC = () => {
       setVoiceStatus('listening');
     } catch (err) {
       console.error("Error accessing microphone:", err);
-      alert("ไม่สามารถเข้าถึงไมโครโฟนได้");
+      alert("Cannot access microphone");
     }
   };
 
@@ -312,18 +316,18 @@ const DashboardPage: React.FC = () => {
           id: crypto.randomUUID(),
           type: (result.type as any) || 'expense',
           amount: result.amount,
-          category: result.category || 'รายจ่ายอื่นๆ',
+          category: result.category || 'Other Expense',
           date: result.date || new Date().toISOString().split('T')[0],
-          description: result.description || 'บันทึกด้วยเสียง',
+          description: result.description || 'Voice Record',
           status: result.status || 'paid'
         };
         await handleAddTransaction(newTx);
       } else {
-        alert("ไม่เข้าใจคำสั่งเสียง");
+        alert("Voice command not understood");
       }
     } catch (error) {
       console.error("Error processing audio:", error);
-      alert("เกิดข้อผิดพลาดในการประมวลผลเสียง");
+      alert("Error processing audio");
     } finally {
       setVoiceStatus('idle');
     }
@@ -367,7 +371,7 @@ const DashboardPage: React.FC = () => {
   }, [transactions, filterMonth, startDate, endDate]);
 
   const totals = useMemo(() => {
-    return monthFilteredTransactions.reduce((acc, t) => {
+    const acc = monthFilteredTransactions.reduce((acc, t) => {
       const amount = t.amount;
       if (t.type === 'income') {
         acc.income += amount;
@@ -380,6 +384,8 @@ const DashboardPage: React.FC = () => {
       }
       return acc;
     }, { income: 0, expense: 0, paidIncome: 0, paidExpense: 0, pendingIncome: 0, pendingExpense: 0 });
+
+    return { ...acc, net: acc.income - acc.expense };
   }, [monthFilteredTransactions]);
 
   // --- Render ---
@@ -407,7 +413,7 @@ const DashboardPage: React.FC = () => {
                 className="flex flex-col items-start hover:bg-slate-100 dark:hover:bg-slate-800 p-2 rounded-lg transition-colors group"
               >
                 <span className="font-bold text-base text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-1">
-                  {currentWallet ? currentWallet.name : 'กำลังโหลด...'}
+                  {currentWallet ? currentWallet.name : 'Loading...'}
                   <ChevronDown size={14} className="text-slate-400 group-hover:text-indigo-500 transition-colors" />
                 </span>
                 <span className="text-[10px] text-indigo-500 font-medium -mt-1">Nanywallet Wallet</span>
@@ -418,7 +424,7 @@ const DashboardPage: React.FC = () => {
                   <div className="fixed inset-0 z-40" onClick={() => setIsWalletDropdownOpen(false)}></div>
                   <div className="absolute left-0 top-full mt-2 w-64 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-2 z-50 animate-in fade-in zoom-in-95 duration-200">
                     <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 mb-1">
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">กระเป๋าเงินของคุณ</p>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Your Wallets</p>
                     </div>
                     <div className="max-h-48 overflow-y-auto custom-scrollbar">
                       {wallets.map(w => (
@@ -443,7 +449,7 @@ const DashboardPage: React.FC = () => {
                           rel="noopener noreferrer"
                           className="w-full text-left flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-sm text-emerald-600 font-medium"
                         >
-                          <ExternalLink size={16} /> เปิดใน Google Sheets
+                          <ExternalLink size={16} /> Open in Google Sheets
                         </a>
                       )}
 
@@ -451,7 +457,7 @@ const DashboardPage: React.FC = () => {
                         onClick={() => { setIsWalletDropdownOpen(false); setIsCreateWalletModalOpen(true); }}
                         className="w-full text-left flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-sm text-indigo-600 font-medium"
                       >
-                        <PlusCircle size={16} /> สร้างกระเป๋าใหม่
+                        <PlusCircle size={16} /> New Wallet
                       </button>
                     </div>
                   </div>
@@ -465,7 +471,7 @@ const DashboardPage: React.FC = () => {
               onClick={loadData}
               disabled={isLoading}
               className={`p-2 rounded-xl transition-colors ${isLoading ? 'animate-spin text-indigo-500' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500'}`}
-              title="รีเฟรชข้อมูล"
+              title="Refresh Data"
             >
               <RefreshCw size={20} />
             </button>
@@ -499,10 +505,10 @@ const DashboardPage: React.FC = () => {
                       <p className="text-xs text-slate-500 truncate">{user?.email}</p>
                     </div>
                     <button onClick={() => { setShowSettings(!showSettings); setIsProfileOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-sm text-slate-600 dark:text-slate-300">
-                      <Settings size={14} /> ตั้งค่า
+                      <Settings size={14} /> Settings
                     </button>
                     <button onClick={() => { logout(); setIsProfileOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 text-sm text-rose-600">
-                      <LogOut size={14} /> ออกจากระบบ
+                      <LogOut size={14} /> Logout
                     </button>
                   </div>
                 </>
@@ -517,24 +523,24 @@ const DashboardPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setIsCreateWalletModalOpen(false)}></div>
           <div className="relative w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 animate-in zoom-in-95 duration-200">
-            <h3 className="text-lg font-bold mb-4">สร้างกระเป๋าเงินใหม่</h3>
+            <h3 className="text-lg font-bold mb-4">Create New Wallet</h3>
             <input
               type="text"
-              placeholder="ชื่อกระเป๋า (เช่น ครอบครัว, ส่วนตัว)"
+              placeholder="Wallet Name (e.g. Family, Personal)"
               className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all mb-4"
               value={newWalletName}
               onChange={(e) => setNewWalletName(e.target.value)}
               autoFocus
             />
             <div className="flex gap-3">
-              <button onClick={() => setIsCreateWalletModalOpen(false)} className="flex-1 py-2.5 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium">ยกเลิก</button>
+              <button onClick={() => setIsCreateWalletModalOpen(false)} className="flex-1 py-2.5 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium">Cancel</button>
               <button
                 onClick={() => handleCreateWallet(newWalletName || 'New Wallet')}
                 disabled={isCreatingWallet || !newWalletName.trim()}
                 className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isCreatingWallet && <Loader2 size={16} className="animate-spin" />}
-                สร้าง
+                Create
               </button>
             </div>
           </div>
@@ -546,24 +552,51 @@ const DashboardPage: React.FC = () => {
           <div className="max-w-5xl mx-auto px-6 py-8">
             <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
               <Settings size={18} className="text-indigo-500" />
-              การตั้งค่า
+              Settings
             </h3>
             <div className="max-w-md">
               <label className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">
-                <Key size={12} /> Gemini AI API Key (สำหรับสั่งงานด้วยเสียง)
+                <Key size={12} /> Gemini AI API Key (For Voice Assistant)
               </label>
               <input
                 type="password"
-                placeholder="กรอก API Key ของคุณ..."
+                placeholder="Enter your API Key..."
                 className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                 value={geminiApiKey}
                 onChange={(e) => { setGeminiApiKey(e.target.value); localStorage.setItem('wealth_gemini_key', e.target.value); }}
               />
+              <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Currency</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {CURRENCIES.map(c => (
+                    <button
+                      key={c.code}
+                      onClick={() => {
+                        setCurrencyCode(c.code);
+                        localStorage.setItem('currency_code', c.code);
+                      }}
+                      className={`flex items-center gap-2 p-3 rounded-xl border transition-all ${currencyCode === c.code
+                        ? 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/20 dark:border-indigo-800 dark:text-indigo-300'
+                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+                        }`}
+                    >
+                      <span className="w-8 h-8 flex items-center justify-center bg-white dark:bg-slate-900 rounded-lg shadow-sm font-bold text-sm">
+                        {c.symbol}
+                      </span>
+                      <div className="text-left">
+                        <p className="font-bold text-xs">{c.code}</p>
+                        <p className="text-[10px] opacity-60 truncate max-w-[80px]">{c.name}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <button
                 onClick={() => setShowSettings(false)}
-                className="mt-4 px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700"
+                className="mt-6 w-full py-3 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none"
               >
-                ปิด
+                Close Settings
               </button>
             </div>
           </div>
@@ -578,9 +611,9 @@ const DashboardPage: React.FC = () => {
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-2">
                 <div className="space-y-0.5">
-                  <p className="text-indigo-100/70 text-[10px] font-bold uppercase tracking-widest">ยอดคงเหลือสุทธิ</p>
+                  <p className="text-indigo-100/70 text-[10px] font-bold uppercase tracking-widest">Net Balance</p>
                   <p className="text-white text-xs font-semibold">
-                    {filterMonth === 'all' ? 'ทั้งหมด' : filterMonth === 'custom' ? 'กำหนดเอง' : `เดือน ${MONTHS_THAI[filterMonth as number]}`}
+                    {filterMonth === 'all' ? 'All' : filterMonth === 'custom' ? 'Custom' : `${MONTHS[filterMonth as number]}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 backdrop-blur-md">
@@ -594,16 +627,16 @@ const DashboardPage: React.FC = () => {
                       else setFilterMonth(parseInt(val));
                     }}
                   >
-                    <option value="all" className="text-slate-900">ทั้งหมด</option>
-                    <option value="custom" className="text-slate-900">กำหนดเอง</option>
-                    {MONTHS_THAI.map((m, i) => (
+                    <option value="all" className="text-slate-900">All</option>
+                    <option value="custom" className="text-slate-900">Custom</option>
+                    {MONTHS.map((m, i) => (
                       <option key={m} value={i} className="text-slate-900">{m}</option>
                     ))}
                   </select>
                 </div>
               </div>
               <h2 className="text-4xl font-bold mb-4 tracking-tight">
-                <span className="text-2xl font-normal mr-1 opacity-80">฿</span>
+                <span className="text-2xl font-normal mr-1 opacity-80">{currencySymbol}</span>
                 {(totals.income - totals.expense).toLocaleString(undefined, { minimumFractionDigits: 2 })}
               </h2>
 
@@ -614,10 +647,10 @@ const DashboardPage: React.FC = () => {
                       <TrendingUp size={18} />
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-100">รายรับรวม</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-100">Total Income</span>
                     </div>
                   </div>
-                  <p className="font-bold text-lg">฿{totals.income.toLocaleString()}</p>
+                  <p className="font-bold text-lg">{currencySymbol}{totals.income.toLocaleString()}</p>
                 </div>
 
                 <div className="flex items-center justify-between bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 group-hover:bg-white/15 transition-all">
@@ -626,10 +659,10 @@ const DashboardPage: React.FC = () => {
                       <TrendingDown size={18} />
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-rose-100">รายจ่ายรวม</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-rose-100">Total Expense</span>
                     </div>
                   </div>
-                  <p className="font-bold text-lg">฿{totals.expense.toLocaleString()}</p>
+                  <p className="font-bold text-lg">{currencySymbol}{totals.expense.toLocaleString()}</p>
                 </div>
               </div>
 
@@ -638,53 +671,55 @@ const DashboardPage: React.FC = () => {
                   onClick={() => setIsAddModalOpen(true)}
                   className="w-full flex items-center justify-center gap-3 py-4 bg-white text-indigo-600 font-bold rounded-2xl shadow-xl hover:bg-indigo-50 active:scale-95 transition-all"
                 >
-                  <Plus size={20} /> เพิ่มรายการใหม่
+                  <Plus size={20} /> Add Transaction
                 </button>
               </div>
             </div>
           </div>
-          <CategoryBreakdown transactions={monthFilteredTransactions} />
+          <CategoryBreakdown transactions={monthFilteredTransactions} currencySymbol={currencySymbol} />
         </div>
 
         {/* Right Column: Transactions & Voice */}
         <div className="lg:col-span-2 space-y-6">
           {/* Voice Assistant */}
-          <div className="bg-gradient-to-br from-indigo-500 to-purple-600 dark:from-indigo-800 dark:to-purple-900 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden transition-all">
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm"><Mic size={24} /></div>
-                  <div>
-                    <h3 className="text-xl font-bold">ผู้ช่วยเสียงอัจฉริยะ</h3>
-                    <p className="text-indigo-100/80 text-xs">บันทึกรายการด้วยเสียง (ภาษาไทย)</p>
+          {geminiApiKey && (
+            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 dark:from-indigo-800 dark:to-purple-900 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden transition-all">
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm"><Mic size={24} /></div>
+                    <div>
+                      <h3 className="text-xl font-bold">AI Voice Assistant</h3>
+                      <p className="text-indigo-100/80 text-xs">Record transactions by voice (Thai supported)</p>
+                    </div>
                   </div>
+                  {voiceStatus === 'processing' && <Loader2 size={24} className="animate-spin text-white/50" />}
                 </div>
-                {voiceStatus === 'processing' && <Loader2 size={24} className="animate-spin text-white/50" />}
-              </div>
 
-              <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/10 mb-6 text-center shadow-inner">
-                {voiceStatus === 'listening' ? (
-                  <div className="space-y-4 py-2">
-                    <p className="text-sm font-medium animate-pulse">กำลังฟังเสียงของคุณ...</p>
-                    <button onClick={stopRecording} className="mx-auto flex items-center gap-2 px-8 py-3 bg-rose-500 hover:bg-rose-600 rounded-2xl font-bold shadow-lg"><Square size={18} /> หยุด</button>
-                  </div>
-                ) : (
-                  <div className="space-y-4 py-2">
-                    <p className="text-sm text-indigo-50 italic opacity-80 leading-relaxed">
-                      "กินก๋วยเตี๋ยว 50 บาท" หรือ "เงินเดือนเข้า 30000"
-                    </p>
-                    <button
-                      onClick={startRecording}
-                      disabled={voiceStatus === 'processing'}
-                      className="mx-auto flex items-center gap-3 px-10 py-4 bg-white text-indigo-600 hover:bg-indigo-50 rounded-2xl font-bold shadow-lg disabled:opacity-50 active:scale-95 transition-all"
-                    >
-                      <Mic size={22} /> กดเพื่อพูด
-                    </button>
-                  </div>
-                )}
+                <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/10 mb-6 text-center shadow-inner">
+                  {voiceStatus === 'listening' ? (
+                    <div className="space-y-4 py-2">
+                      <p className="text-sm font-medium animate-pulse">Listening...</p>
+                      <button onClick={stopRecording} className="mx-auto flex items-center gap-2 px-8 py-3 bg-rose-500 hover:bg-rose-600 rounded-2xl font-bold shadow-lg"><Square size={18} /> Stop</button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 py-2">
+                      <p className="text-sm text-indigo-50 italic opacity-80 leading-relaxed">
+                        "Lunch 50 baht" or "Salary 30000"
+                      </p>
+                      <button
+                        onClick={startRecording}
+                        disabled={voiceStatus === 'processing'}
+                        className="mx-auto flex items-center gap-3 px-10 py-4 bg-white text-indigo-600 hover:bg-indigo-50 rounded-2xl font-bold shadow-lg disabled:opacity-50 active:scale-95 transition-all"
+                      >
+                        <Mic size={22} /> Tap to Speak
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <TransactionList
             transactions={filteredTransactions}
@@ -703,6 +738,7 @@ const DashboardPage: React.FC = () => {
             onStatusChange={setFilterStatus}
             filterCategory={filterCategory}
             onCategoryChange={setFilterCategory}
+            currencySymbol={currencySymbol}
           />
         </div>
       </main>
@@ -726,6 +762,7 @@ const DashboardPage: React.FC = () => {
               onUpdate={handleUpdateTransaction}
               initialData={editingTransaction || undefined}
               onClose={() => { setIsAddModalOpen(false); setEditingTransaction(null); }}
+              currencySymbol={currencySymbol}
             />
           </div>
         </div>
@@ -773,12 +810,12 @@ const DashboardPage: React.FC = () => {
 
                 {/* Navigation */}
                 <div className="space-y-1">
-                  <p className="px-2 text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">เมนูหลัก</p>
+                  <p className="px-2 text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Main Menu</p>
                   <button onClick={() => setIsSidebarOpen(false)} className="w-full flex items-center gap-3 px-3 py-2.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 rounded-lg font-medium">
-                    <TrendingUp size={18} /> ภาพรวม
+                    <TrendingUp size={18} /> Overview
                   </button>
                   <button onClick={() => { setIsSidebarOpen(false); setIsCreateWalletModalOpen(true); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg font-medium transition-colors">
-                    <PlusCircle size={18} /> สร้างกระเป๋าใหม่
+                    <PlusCircle size={18} /> New Wallet
                   </button>
                   {currentWallet && (
                     <a
@@ -788,14 +825,14 @@ const DashboardPage: React.FC = () => {
                       className="w-full flex items-center gap-3 px-3 py-2.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg font-medium transition-colors"
                       onClick={() => setIsSidebarOpen(false)}
                     >
-                      <ExternalLink size={18} /> เปิดใน Google Sheets
+                      <ExternalLink size={18} /> Open in Google Sheets
                     </a>
                   )}
                 </div>
 
                 {/* Wallets */}
                 <div className="space-y-1">
-                  <p className="px-2 text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">กระเป๋าเงิน</p>
+                  <p className="px-2 text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Wallets</p>
                   {wallets.map(w => (
                     <button
                       key={w.id}
@@ -822,7 +859,7 @@ const DashboardPage: React.FC = () => {
                 >
                   <div className="flex items-center gap-3">
                     {darkMode ? <Sun size={18} /> : <Moon size={18} />}
-                    <span>{darkMode ? 'โหมดสว่าง' : 'โหมดมืด'}</span>
+                    <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
                   </div>
                 </button>
 
@@ -830,14 +867,14 @@ const DashboardPage: React.FC = () => {
                   onClick={() => { setIsSidebarOpen(false); setShowSettings(true); }}
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg font-medium transition-colors"
                 >
-                  <Settings size={18} /> ตั้งค่า
+                  <Settings size={18} /> Settings
                 </button>
 
                 <button
                   onClick={logout}
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg font-medium transition-colors"
                 >
-                  <LogOut size={18} /> ออกจากระบบ
+                  <LogOut size={18} /> Logout
                 </button>
               </div>
             </div>

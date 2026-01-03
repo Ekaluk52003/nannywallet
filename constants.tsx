@@ -1,32 +1,40 @@
 
 export const INCOME_CATEGORIES = [
-  'เงินเดือน',
-  'โบนัส',
-  'การลงทุน',
-  'งานอิสระ (Freelance)',
-  'ของขวัญ',
-  'รายได้อื่นๆ'
+  'Salary',
+  'Bonus',
+  'Investment',
+  'Freelance',
+  'Gift',
+  'Other Income'
 ];
 
 export const EXPENSE_CATEGORIES = [
-  'ค่าเช่า/ค่าบ้าน',
-  'ของสด/ซูเปอร์มาร์เก็ต',
-  'ทานข้าวนอกบ้าน',
-  'ค่าน้ำ/ค่าไฟ/สาธารณูปโภค',
-  'การเดินทาง',
-  'ความบันเทิง',
-  'สุขภาพ/ยา',
-  'ช้อปปิ้ง',
-  'ค่าสมาชิก (Subscription)',
-  'รายจ่ายอื่นๆ'
+  'Rent/Housing',
+  'Groceries',
+  'Dining Out',
+  'Utilities/Bills',
+  'Transportation',
+  'Entertainment',
+  'Health/Medicine',
+  'Shopping',
+  'Subscription',
+  'Other Expense'
 ];
 
-export const MONTHS_THAI = [
-  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+export const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-export const MONTHS_SHORT_THAI = [
-  'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
-  'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+export const MONTHS_SHORT = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+];
+
+export const CURRENCIES = [
+  { code: 'THB', symbol: '฿', name: 'Thai Baht' },
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'JPY', symbol: '¥', name: 'Japanese Yen' },
+  { code: 'GBP', symbol: '£', name: 'British Pound' },
 ];

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Transaction, TransactionStatus, TransactionType } from '../types';
 import { Trash2, Coffee, Home, Car, Heart, ShoppingBag, Briefcase, Gift, Layers, CheckCircle, Calendar, Filter, CreditCard, ArrowDownCircle, Edit2, Play, TrendingUp } from 'lucide-react';
-import { MONTHS_THAI, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
+import { MONTHS, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
 
 interface Props {
   transactions: Transaction[];
@@ -20,38 +20,38 @@ interface Props {
   onStatusChange: (status: 'all' | TransactionStatus) => void;
   filterCategory: string | 'all';
   onCategoryChange: (category: string | 'all') => void;
+  currencySymbol: string;
 }
 
 const CategoryIcon: React.FC<{ category: string, size?: number }> = ({ category, size = 16 }) => {
   const props = { size };
   const cat = category.toLowerCase();
-  
+
   // Expenses
-  if (cat.includes('ทานข้าว') || cat.includes('อาหาร') || cat.includes('dining')) return <Coffee {...props} />;
-  if (cat.includes('ค่าเช่า') || cat.includes('บ้าน') || cat.includes('rent') || cat.includes('mortgage') || cat.includes('utilities') || cat.includes('สาธารณูปโภค')) return <Home {...props} />;
-  if (cat.includes('เดินทาง') || cat.includes('transport') || cat.includes('รถ')) return <Car {...props} />;
-  if (cat.includes('สุขภาพ') || cat.includes('ยา') || cat.includes('health')) return <Heart {...props} />;
-  if (cat.includes('ช้อปปิ้ง') || cat.includes('shopping') || cat.includes('ซื้อของ') || cat.includes('ของสด') || cat.includes('ซูเปอร์มาร์เก็ต')) return <ShoppingBag {...props} />;
-  if (cat.includes('เงินเดือน') || cat.includes('งานอิสระ') || cat.includes('salary') || cat.includes('freelance')) return <Briefcase {...props} />;
-  if (cat.includes('โบนัส') || cat.includes('bonus')) return <Briefcase {...props} />;
-  if (cat.includes('ของขวัญ') || cat.includes('gift')) return <Gift {...props} />;
-  if (cat.includes('บันเทิง') || cat.includes('entertainment')) return <Play {...props} />;
-  if (cat.includes('สมาชิก') || cat.includes('subscription')) return <CreditCard {...props} />;
-  
+  if (cat.includes('dining') || cat.includes('food')) return <Coffee {...props} />;
+  if (cat.includes('rent') || cat.includes('housing') || cat.includes('home') || cat.includes('utilities') || cat.includes('bills')) return <Home {...props} />;
+  if (cat.includes('transport') || cat.includes('car')) return <Car {...props} />;
+  if (cat.includes('health') || cat.includes('medicine')) return <Heart {...props} />;
+  if (cat.includes('shopping') || cat.includes('groceries') || cat.includes('market')) return <ShoppingBag {...props} />;
+  if (cat.includes('salary') || cat.includes('freelance') || cat.includes('job') || cat.includes('bonus')) return <Briefcase {...props} />;
+  if (cat.includes('gift')) return <Gift {...props} />;
+  if (cat.includes('entertainment')) return <Play {...props} />;
+  if (cat.includes('subscription')) return <CreditCard {...props} />;
+
   // Income specific
-  if (cat.includes('การลงทุน') || cat.includes('invest') || cat.includes('หุ้น')) return <TrendingUp {...props} />;
-  
+  if (cat.includes('investment') || cat.includes('stocks')) return <TrendingUp {...props} />;
+
   return <Layers {...props} />;
 };
 
 const CATEGORY_LIST = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES];
 
-const TransactionList: React.FC<Props> = ({ 
-  transactions, 
-  onDelete, 
-  onUpdateStatus, 
+const TransactionList: React.FC<Props> = ({
+  transactions,
+  onDelete,
+  onUpdateStatus,
   onEditTransaction,
-  filterMonth, 
+  filterMonth,
   onMonthChange,
   startDate,
   endDate,
@@ -62,7 +62,8 @@ const TransactionList: React.FC<Props> = ({
   filterStatus,
   onStatusChange,
   filterCategory,
-  onCategoryChange
+  onCategoryChange,
+  currencySymbol
 }) => {
   return (
     <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm transition-all">
@@ -70,34 +71,34 @@ const TransactionList: React.FC<Props> = ({
       <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 className="font-bold text-lg text-slate-800 dark:text-slate-100">รายการธุรกรรม</h3>
+            <h3 className="font-bold text-lg text-slate-800 dark:text-slate-100">Transactions</h3>
             <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-[0.1em] mt-0.5">
-              {filterMonth === 'all' ? 'ประวัติทั้งหมด' : filterMonth === 'custom' ? 'กำหนดเอง' : `เดือน${MONTHS_THAI[filterMonth as number]}`} • {transactions.length} รายการ
+              {filterMonth === 'all' ? 'All History' : filterMonth === 'custom' ? 'Custom Range' : `${MONTHS[filterMonth as number]}`} • {transactions.length} items
             </p>
           </div>
-          
+
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {filterMonth === 'custom' && (
               <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
-                <input 
-                  type="date" 
+                <input
+                  type="date"
                   value={startDate}
                   onChange={(e) => onStartDateChange?.(e.target.value)}
                   className="px-2 py-1.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-xl text-[10px] font-bold text-slate-600 dark:text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
                 <span className="text-slate-300">-</span>
-                <input 
-                  type="date" 
+                <input
+                  type="date"
                   value={endDate}
                   onChange={(e) => onEndDateChange?.(e.target.value)}
                   className="px-2 py-1.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-xl text-[10px] font-bold text-slate-600 dark:text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
               </div>
             )}
-            
+
             <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900/50 p-1 rounded-xl border border-slate-100 dark:border-slate-800">
               <div className="pl-2 text-slate-400 dark:text-slate-500"><Calendar size={12} /></div>
-              <select 
+              <select
                 className="bg-transparent text-[11px] font-bold text-slate-600 dark:text-slate-300 outline-none cursor-pointer pr-3"
                 value={filterMonth}
                 onChange={(e) => {
@@ -106,9 +107,9 @@ const TransactionList: React.FC<Props> = ({
                   else onMonthChange(parseInt(val));
                 }}
               >
-                <option value="all" className="text-slate-900">ทุกเดือน</option>
-                <option value="custom" className="text-slate-900">กำหนดเอง</option>
-                {MONTHS_THAI.map((m, i) => (
+                <option value="all" className="text-slate-900">All Months</option>
+                <option value="custom" className="text-slate-900">Custom</option>
+                {MONTHS.map((m, i) => (
                   <option key={m} value={i} className="text-slate-900">{m}</option>
                 ))}
               </select>
@@ -120,7 +121,7 @@ const TransactionList: React.FC<Props> = ({
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5 bg-slate-100/50 dark:bg-slate-900/30 px-2.5 py-1 rounded-lg border border-slate-100/50 dark:border-slate-800">
               <Filter size={10} className="text-slate-400" />
-              <select 
+              <select
                 className="bg-transparent text-[9px] font-black text-slate-500 dark:text-slate-400 outline-none cursor-pointer uppercase tracking-wider"
                 value={filterType}
                 onChange={(e) => {
@@ -128,22 +129,22 @@ const TransactionList: React.FC<Props> = ({
                   onCategoryChange('all');
                 }}
               >
-                <option value="all" className="text-slate-900">ทุกประเภท</option>
-                <option value="income" className="text-slate-900">รายรับ</option>
-                <option value="expense" className="text-slate-900">รายจ่าย</option>
+                <option value="all" className="text-slate-900">All Types</option>
+                <option value="income" className="text-slate-900">Income</option>
+                <option value="expense" className="text-slate-900">Expense</option>
               </select>
             </div>
 
             <div className="flex items-center gap-1.5 bg-slate-100/50 dark:bg-slate-900/30 px-2.5 py-1 rounded-lg border border-slate-100/50 dark:border-slate-800">
               <CheckCircle size={10} className="text-slate-400" />
-              <select 
+              <select
                 className="bg-transparent text-[9px] font-black text-slate-500 dark:text-slate-400 outline-none cursor-pointer uppercase tracking-wider"
                 value={filterStatus}
                 onChange={(e) => onStatusChange(e.target.value as any)}
               >
-                <option value="all" className="text-slate-900">ทุกสถานะ</option>
-                <option value="paid" className="text-slate-900">เรียบร้อย</option>
-                <option value="pending" className="text-slate-900">รอดำเนินการ</option>
+                <option value="all" className="text-slate-900">All Status</option>
+                <option value="paid" className="text-slate-900">Paid/Received</option>
+                <option value="pending" className="text-slate-900">Pending</option>
               </select>
             </div>
           </div>
@@ -153,7 +154,7 @@ const TransactionList: React.FC<Props> = ({
             <button
               onClick={() => onCategoryChange('all')}
               className={`flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-[8px] font-black uppercase transition-all ${filterCategory === 'all' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 dark:bg-slate-900 text-slate-400 hover:bg-slate-100'}`}
-              title="ทั้งหมด"
+              title="All"
             >
               All
             </button>
@@ -178,21 +179,20 @@ const TransactionList: React.FC<Props> = ({
             <div className="p-5 rounded-full bg-slate-50 dark:bg-slate-900 mb-3 text-slate-200 dark:text-slate-800">
               <Layers size={40} />
             </div>
-            <p className="text-slate-400 dark:text-slate-500 text-xs font-medium">ไม่พบข้อมูลที่ค้นหา</p>
+            <p className="text-slate-400 dark:text-slate-500 text-xs font-medium">No transactions found</p>
           </div>
         ) : (
           transactions.map((t) => (
-            <div 
-              key={t.id} 
+            <div
+              key={t.id}
               onClick={() => onEditTransaction?.(t)}
               className="group px-4 sm:px-6 py-3 sm:py-4 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-all flex items-start sm:items-center gap-3 sm:gap-4 cursor-pointer"
             >
               {/* Zone 1: Icon */}
-              <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 ${
-                t.status === 'pending' 
-                  ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400' 
-                  : (t.type === 'income' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300')
-              }`}>
+              <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 ${t.status === 'pending'
+                ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400'
+                : (t.type === 'income' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300')
+                }`}>
                 <CategoryIcon category={t.category} size={18} />
               </div>
 
@@ -206,48 +206,47 @@ const TransactionList: React.FC<Props> = ({
                   <div className="flex items-center gap-2 text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                     <span>{t.category}</span>
                     <span className="opacity-30">•</span>
-                    <span>{new Date(t.date).toLocaleDateString('th-TH', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                    <span>{new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                   </div>
                 </div>
 
                 {/* Zone 3: Financials & Actions */}
                 <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto pl-1 sm:pl-0">
                   <div className="text-left sm:text-right sm:min-w-[90px]">
-                    <p className={`font-black text-sm leading-tight ${
-                      t.type === 'income' 
-                        ? 'text-emerald-600 dark:text-emerald-400' 
-                        : (t.status === 'pending' ? 'text-amber-600 dark:text-amber-500' : 'text-slate-800 dark:text-slate-200')
-                    }`}>
-                      {t.type === 'income' ? '+' : '-'}฿{t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <p className={`font-black text-sm leading-tight ${t.type === 'income'
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : (t.status === 'pending' ? 'text-amber-600 dark:text-amber-500' : 'text-slate-800 dark:text-slate-200')
+                      }`}>
+                      {t.type === 'income' ? '+' : '-'}{currencySymbol}{t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                     {t.status === 'pending' && (
-                      <p className="text-[8px] font-black text-amber-500/80 uppercase tracking-widest mt-0.5">ยังไม่ชำระ</p>
+                      <p className="text-[8px] font-black text-amber-500/80 uppercase tracking-widest mt-0.5">Pending</p>
                     )}
                   </div>
 
-                  <div 
-                    className="flex items-center gap-1.5" 
+                  <div
+                    className="flex items-center gap-1.5"
                     onClick={(e) => e.stopPropagation()}
                   >
                     {t.status === 'pending' ? (
-                      <button 
+                      <button
                         onClick={() => onUpdateStatus?.(t.id, 'paid')}
                         className="flex items-center gap-1.5 h-8 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-[9px] font-black rounded-lg shadow-sm active:scale-95 transition-all uppercase whitespace-nowrap"
                       >
                         {t.type === 'expense' ? <CreditCard size={12} /> : <ArrowDownCircle size={12} />}
-                        {t.type === 'expense' ? 'จ่ายแล้ว' : 'รับเงิน'}
+                        {t.type === 'expense' ? 'Pay' : 'Receive'}
                       </button>
                     ) : (
-                      <button 
+                      <button
                         onClick={() => onUpdateStatus?.(t.id, 'pending')}
                         className="w-8 h-8 flex items-center justify-center text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all"
-                        title="ยกเลิกสถานะ"
+                        title="Mark as Pending"
                       >
                         <CheckCircle size={16} />
                       </button>
                     )}
-                    
-                    <button 
+
+                    <button
                       onClick={() => onDelete(t.id)}
                       className="w-8 h-8 flex items-center justify-center text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/50 rounded-lg transition-all"
                     >
