@@ -897,17 +897,7 @@ function doPost(e) {
                 </div>
               </div>
               <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-700">
-                <div className="flex gap-4 mb-4">
-                  <div className="p-3 bg-indigo-100 dark:bg-indigo-900/40 rounded-2xl text-indigo-600">
-                    <Info size={24} />
-                  </div>
-                  <div>
-                    <h4 className="font-bold">ทำไมต้องระบุ Key เอง?</h4>
-                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">เพื่อให้คุณเป็นเจ้าของข้อมูลทั้งหมด และใช้งานโควตาฟรีส่วนตัวของคุณได้โดยตรง ไม่ต้องผ่านเซิร์ฟเวอร์กลาง</p>
-                  </div>
-                </div>
-
-
+               
                 <button
                   onClick={() => setShowSettings(false)}
                   disabled={!sheetUrl}
@@ -915,6 +905,18 @@ function doPost(e) {
                 >
                   บันทึกและเริ่มใช้งาน
                 </button>
+
+                 <div className="flex gap-4 mb-2 mt-2">
+                  <div className="p-3 bg-indigo-100 dark:bg-indigo-900/40 rounded-2xl text-indigo-600">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                      <path d="M12.0002 4.10376C13.5658 8.01633 15.9839 10.4344 19.8965 12.0002C15.9839 13.5659 13.5658 15.9839 12.0002 19.8965C10.4346 15.9839 8.01653 13.5659 4.10376 12.0002C8.01653 10.4344 10.4346 8.01633 12.0002 4.10376Z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="font-bold">ต้องการ ผู้ช่วย AI ?</h4>
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">เพื่อใช้งานการจดคำสั่งด้วย AI voice กรุณากรอก Gemini API Key</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
