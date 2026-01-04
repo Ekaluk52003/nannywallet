@@ -10,6 +10,9 @@ interface Props {
   onEditTransaction?: (transaction: Transaction) => void;
   filterMonth: number | 'all' | 'custom';
   onMonthChange: (month: number | 'all' | 'custom') => void;
+  filterYear: number | 'all';
+  onYearChange: (year: number | 'all') => void;
+  availableYears: number[];
   startDate?: string;
   endDate?: string;
   onStartDateChange?: (date: string) => void;
@@ -63,7 +66,10 @@ const TransactionList: React.FC<Props> = ({
   onStatusChange,
   filterCategory,
   onCategoryChange,
-  currencySymbol
+  currencySymbol,
+  filterYear,
+  onYearChange,
+  availableYears
 }) => {
   return (
     <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm transition-all">
@@ -97,7 +103,18 @@ const TransactionList: React.FC<Props> = ({
             )}
 
             <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900/50 p-1 rounded-xl border border-slate-100 dark:border-slate-800">
-              <div className="pl-2 text-slate-400 dark:text-slate-500"><Calendar size={12} /></div>
+              <select
+                className="bg-transparent text-[11px] font-bold text-slate-600 dark:text-slate-300 outline-none cursor-pointer pl-2"
+                value={filterYear}
+                onChange={(e) => onYearChange(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+              >
+                {availableYears.map(y => (
+                  <option key={y} value={y} className="text-slate-900">{y}</option>
+                ))}
+                <option value="all" className="text-slate-900">All Years</option>
+              </select>
+              <div className="w-px h-3 bg-slate-200 dark:bg-slate-700"></div>
+              <div className="pl-1 text-slate-400 dark:text-slate-500"><Calendar size={12} /></div>
               <select
                 className="bg-transparent text-[11px] font-bold text-slate-600 dark:text-slate-300 outline-none cursor-pointer pr-3"
                 value={filterMonth}

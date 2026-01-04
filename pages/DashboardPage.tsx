@@ -46,6 +46,7 @@ const DashboardPage: React.FC = () => {
 
   // Filter States
   const [filterMonth, setFilterMonth] = useState<number | 'all' | 'custom'>(new Date().getMonth());
+  const [filterYear, setFilterYear] = useState<number | 'all'>(new Date().getFullYear());
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [filterType, setFilterType] = useState<'all' | TransactionType>('all');
@@ -60,6 +61,15 @@ const DashboardPage: React.FC = () => {
   const currencySymbol = CURRENCIES.find(c => c.code === currencyCode)?.symbol || '฿';
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+
+  const availableYears = useMemo(() => {
+    const years = new Set([new Date().getFullYear()]);
+    transactions.forEach(t => {
+      const parts = t.date.split('-');
+      if (parts[0]) years.add(parseInt(parts[0]));
+    });
+    return Array.from(years).sort((a, b) => b - a);
+  }, [transactions]);
 
   // Theme Effect
   useEffect(() => {
@@ -340,11 +350,14 @@ const DashboardPage: React.FC = () => {
       if (filterMonth === 'custom') {
         if (startDate && t.date < startDate) dateMatch = false;
         if (endDate && t.date > endDate) dateMatch = false;
-      } else if (filterMonth !== 'all') {
+      } else {
         const parts = t.date.split('-');
         if (parts.length >= 2) {
+          const tYear = parseInt(parts[0], 10);
           const tMonth = parseInt(parts[1], 10) - 1;
-          dateMatch = tMonth === filterMonth;
+
+          if (filterYear !== 'all' && tYear !== filterYear) dateMatch = false;
+          if (filterMonth !== 'all' && tMonth !== filterMonth) dateMatch = false;
         }
       }
       const typeMatch = filterType === 'all' || t.type === filterType;
@@ -352,7 +365,7 @@ const DashboardPage: React.FC = () => {
       const categoryMatch = filterCategory === 'all' || t.category === filterCategory;
       return dateMatch && typeMatch && statusMatch && categoryMatch;
     }).sort((a, b) => b.date.localeCompare(a.date));
-  }, [transactions, filterMonth, startDate, endDate, filterType, filterStatus, filterCategory]);
+  }, [transactions, filterMonth, filterYear, startDate, endDate, filterType, filterStatus, filterCategory]);
 
   const monthFilteredTransactions = useMemo(() => {
     return transactions.filter(t => {
@@ -361,14 +374,17 @@ const DashboardPage: React.FC = () => {
         if (endDate && t.date > endDate) return false;
         return true;
       }
-      if (filterMonth === 'all') return true;
+
       const parts = t.date.split('-');
-      if (parts.length >= 2) {
-        return parseInt(parts[1], 10) - 1 === filterMonth;
-      }
-      return false;
+      const tYear = parseInt(parts[0], 10);
+      const tMonth = parseInt(parts[1], 10) - 1;
+
+      if (filterYear !== 'all' && tYear !== filterYear) return false;
+      if (filterMonth !== 'all' && tMonth !== filterMonth) return false;
+
+      return true;
     });
-  }, [transactions, filterMonth, startDate, endDate]);
+  }, [transactions, filterMonth, filterYear, startDate, endDate]);
 
   const totals = useMemo(() => {
     const acc = monthFilteredTransactions.reduce((acc, t) => {
@@ -617,6 +633,17 @@ const DashboardPage: React.FC = () => {
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 backdrop-blur-md">
+                  <select
+                    className="bg-transparent text-[10px] font-bold text-white outline-none cursor-pointer"
+                    value={filterYear}
+                    onChange={(e) => setFilterYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                  >
+                    {availableYears.map(y => (
+                      <option key={y} value={y} className="text-slate-900">{y}</option>
+                    ))}
+                    <option value="all" className="text-slate-900">All Years</option>
+                  </select>
+                  <div className="w-px h-3 bg-white/20"></div>
                   <Calendar size={12} className="text-white/60" />
                   <select
                     className="bg-transparent text-[10px] font-bold text-white outline-none cursor-pointer"
@@ -728,6 +755,9 @@ const DashboardPage: React.FC = () => {
             onEditTransaction={setEditingTransaction}
             filterMonth={filterMonth}
             onMonthChange={setFilterMonth}
+            filterYear={filterYear}
+            onYearChange={setFilterYear}
+            availableYears={availableYears}
             startDate={startDate}
             endDate={endDate}
             onStartDateChange={setStartDate}
