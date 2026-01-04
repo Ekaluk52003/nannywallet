@@ -19,13 +19,18 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(localStorage.getItem('google_access_token'));
-  const [isLoading, setIsLoading] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true); // Default to true to block premature rendering
 
   const login = useGoogleLogin({
     onSuccess: (tokenResponse: TokenResponse) => {
+      const expiresIn = tokenResponse.expires_in || 3599;
+      const expiryDate = Date.now() + expiresIn * 1000;
+
       setAccessToken(tokenResponse.access_token);
       localStorage.setItem('google_access_token', tokenResponse.access_token);
+      localStorage.setItem('token_expiry', expiryDate.toString());
+
       fetchUserProfile(tokenResponse.access_token);
     },
     onError: (error) => console.log('Login Failed:', error),
@@ -38,14 +43,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(null);
     setAccessToken(null);
     localStorage.removeItem('google_access_token');
+    localStorage.removeItem('token_expiry');
     localStorage.removeItem('user_profile');
     localStorage.removeItem('nanny_spreadsheet_id');
     localStorage.removeItem('last_wallet_id');
   };
 
   const fetchUserProfile = async (token: string) => {
-    setIsLoading(true);
-    console.log("Fetching user profile...");
+    // Don't set global isLoading to true here if we want background refresh,
+    // but for initial load it's fine.
     try {
       const res = await fetch(`https://www.googleapis.com/oauth2/v1/userinfo?access_token=${token}`, {
         headers: {
@@ -53,7 +59,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           Accept: 'application/json',
         },
       });
-      
+
       if (!res.ok) {
         throw new Error(`Failed to fetch user profile: ${res.status} ${res.statusText}`);
       }
@@ -79,16 +85,44 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Restore user session on mount
   useEffect(() => {
     const storedToken = localStorage.getItem('google_access_token');
+    const storedExpiry = localStorage.getItem('token_expiry');
     const storedUser = localStorage.getItem('user_profile');
-    
-    if (storedToken) {
-      setAccessToken(storedToken);
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
+
+    const checkSession = async () => {
+      if (storedToken) {
+        // 1. Check Expiry if available
+        if (storedExpiry) {
+          const expiryTime = parseInt(storedExpiry, 10);
+          if (Date.now() > expiryTime) {
+            console.log("Token expired, logging out.");
+            logout();
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        // 2. Token seems valid (or unknown expiry), set it
+        setAccessToken(storedToken);
+
+        // 3. Restore User or Fetch
+        if (storedUser) {
+          setUser(JSON.parse(storedUser));
+          // Optional: Validate token in background if we relied on localStorage expiry
+          // If we didn't have expiry (legacy), we MUST validate.
+          if (!storedExpiry) {
+            await fetchUserProfile(storedToken);
+          } else {
+            setIsLoading(false);
+          }
+        } else {
+          await fetchUserProfile(storedToken);
+        }
       } else {
-        fetchUserProfile(storedToken);
+        setIsLoading(false);
       }
-    }
+    };
+
+    checkSession();
   }, []);
 
   return (
