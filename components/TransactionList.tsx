@@ -1,6 +1,6 @@
 import React from 'react';
 import { Transaction, TransactionStatus, TransactionType } from '../types';
-import { Trash2, Coffee, Home, Car, Heart, ShoppingBag, Briefcase, Gift, Layers, CheckCircle, Calendar, Filter, CreditCard, ArrowDownCircle, Edit2, Play, TrendingUp } from 'lucide-react';
+import { Trash2, Coffee, Home, Car, Heart, ShoppingBag, Briefcase, Gift, Layers, CheckCircle, Calendar, Filter, CreditCard, ArrowDownCircle, Edit2, Play, TrendingUp, Search } from 'lucide-react';
 import { MONTHS, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants';
 
 interface Props {
@@ -71,6 +71,17 @@ const TransactionList: React.FC<Props> = ({
   onYearChange,
   availableYears
 }) => {
+  const [searchQuery, setSearchQuery] = React.useState('');
+
+  const filteredTransactions = React.useMemo(() => {
+    if (!searchQuery.trim()) return transactions;
+    const query = searchQuery.toLowerCase();
+    return transactions.filter(t =>
+      t.description.toLowerCase().includes(query) ||
+      t.category.toLowerCase().includes(query)
+    );
+  }, [transactions, searchQuery]);
+
   return (
     <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm transition-all">
       {/* Header & Filters */}
@@ -79,11 +90,22 @@ const TransactionList: React.FC<Props> = ({
           <div>
             <h3 className="font-bold text-lg text-slate-800 dark:text-slate-100">Transactions</h3>
             <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-[0.1em] mt-0.5">
-              {filterMonth === 'all' ? 'All History' : filterMonth === 'custom' ? 'Custom Range' : `${MONTHS[filterMonth as number]}`} • {transactions.length} items
+              {filterMonth === 'all' ? 'All History' : filterMonth === 'custom' ? 'Custom Range' : `${MONTHS[filterMonth as number]}`} • {filteredTransactions.length} items
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="relative group">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-xl text-[10px] font-bold text-slate-600 dark:text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/20 w-24 sm:w-32 focus:w-48 transition-all placeholder:text-slate-400"
+              />
+            </div>
+
             {filterMonth === 'custom' && (
               <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
                 <input
@@ -191,7 +213,7 @@ const TransactionList: React.FC<Props> = ({
 
       {/* Transaction Rows */}
       <div className="divide-y divide-slate-100 dark:divide-slate-700/50 max-h-[500px] overflow-y-auto custom-scrollbar">
-        {transactions.length === 0 ? (
+        {filteredTransactions.length === 0 ? (
           <div className="p-16 text-center flex flex-col items-center">
             <div className="p-5 rounded-full bg-slate-50 dark:bg-slate-900 mb-3 text-slate-200 dark:text-slate-800">
               <Layers size={40} />
@@ -199,7 +221,7 @@ const TransactionList: React.FC<Props> = ({
             <p className="text-slate-400 dark:text-slate-500 text-xs font-medium">No transactions found</p>
           </div>
         ) : (
-          transactions.map((t) => (
+          filteredTransactions.map((t) => (
             <div
               key={t.id}
               onClick={() => onEditTransaction?.(t)}
